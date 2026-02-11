@@ -4,8 +4,8 @@
   "description": "Text selection popup: internal links, path copy, Cosense note creation, paragraph splitting",
   "main": "main.js",
   "scripts": {
-    "dev": "esbuild src/main.ts --bundle --external:obsidian --outfile=main.js --platform=browser --watch",
-    "build": "esbuild src/main.ts --bundle --external:obsidian --outfile=main.js --platform=browser",
+    "dev": "esbuild src/main.ts --bundle --external:obsidian --outfile=main.js --platform=browser --format=cjs --watch",
+    "build": "esbuild src/main.ts --bundle --external:obsidian --outfile=main.js --platform=browser --format=cjs",
     "test": "jest --verbose",
     "test:coverage": "jest --verbose --coverage"
   },

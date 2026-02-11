@@ -13,7 +13,7 @@ import { QuickPopupSettingTab } from './settings-tab';
  * テキスト選択時にポップアップを表示し、内部リンク作成、パスコピー、
  * Cosense記事作成、段落分割などの機能を提供する
  */
-export default class QuickPopupPlugin extends Plugin {
+class QuickPopupPlugin extends Plugin {
   settings!: QuickPopupSettings;
   buttonRegistry!: ButtonRegistry;
   hotkeyManager!: HotkeyManager;
@@ -405,3 +405,6 @@ export default class QuickPopupPlugin extends Plugin {
     this.popupManager.refresh();
   }
 }
+
+module.exports = QuickPopupPlugin;
+module.exports.default = QuickPopupPlugin;
