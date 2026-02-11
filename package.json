@@ -1,0 +1,26 @@
+{
+  "name": "quick-link-popup",
+  "version": "2.0.0",
+  "description": "Text selection popup: internal links, path copy, Cosense note creation, paragraph splitting",
+  "main": "main.js",
+  "scripts": {
+    "dev": "esbuild src/main.ts --bundle --external:obsidian --outfile=main.js --platform=browser --watch",
+    "build": "esbuild src/main.ts --bundle --external:obsidian --outfile=main.js --platform=browser",
+    "test": "jest --verbose",
+    "test:coverage": "jest --verbose --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "obsidian": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.0",
+    "esbuild": "^0.18.0",
+    "jest": "^30.2.0",
+    "typescript": "^5.0.0"
+  }
+}
+
