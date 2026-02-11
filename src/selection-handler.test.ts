@@ -1,0 +1,351 @@
+/**
+ * SelectionHandler - テキスト選択処理テスト
+ *
+ * TDD: RED フェーズ
+ */
+
+import { SelectionHandler } from './selection-handler';
+import { Editor } from 'obsidian';
+
+describe('SelectionHandler - テキスト選択処理', () => {
+  let handler: SelectionHandler;
+  let mockEditor: Partial<Editor>;
+
+  beforeEach(() => {
+    handler = new SelectionHandler();
+
+    // Mock Editor
+    mockEditor = {
+      getSelection: jest.fn(() => 'selected text'),
+      replaceSelection: jest.fn(),
+      setCursor: jest.fn(),
+      getCursor: jest.fn(() => ({ line: 0, ch: 10 })),
+    };
+
+    handler.setEditor(mockEditor as Editor);
+  });
+
+  describe('getSelectedText', () => {
+    it('should return selected text from editor', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('Hello, World!');
+
+      // Act
+      const result = handler.getSelectedText();
+
+      // Assert
+      expect(result).toBe('Hello, World!');
+      expect(mockEditor.getSelection).toHaveBeenCalled();
+    });
+
+    it('should return empty string when no selection', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('');
+
+      // Act
+      const result = handler.getSelectedText();
+
+      // Assert
+      expect(result).toBe('');
+    });
+  });
+
+  describe('hasValidSelection', () => {
+    it('should return true when text is selected', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('some text');
+
+      // Act
+      const result = handler.hasValidSelection();
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it('should return false when no text is selected', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('');
+
+      // Act
+      const result = handler.hasValidSelection();
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it('should return false when only whitespace is selected', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('   ');
+
+      // Act
+      const result = handler.hasValidSelection();
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it('should return true when whitespace and text are mixed', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('  text  ');
+
+      // Act
+      const result = handler.hasValidSelection();
+
+      // Assert
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('convertToLink', () => {
+    it('should wrap selected text with [[...]]', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('my note');
+
+      // Act
+      handler.convertToLink();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('[[my note]]');
+    });
+
+    it('should handle text that already has brackets', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('[[already linked]]');
+
+      // Act
+      handler.convertToLink();
+
+      // Assert
+      // Should remove existing brackets and re-wrap
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('[[already linked]]');
+    });
+
+    it('should handle text with mixed brackets', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('[[partial] link]');
+
+      // Act
+      handler.convertToLink();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalled();
+      const call = (mockEditor.replaceSelection as jest.Mock).mock.calls[0][0];
+      expect(call).toMatch(/^\[\[.*\]\]$/);
+    });
+
+    it('should insert empty brackets when no text selected', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('');
+      (mockEditor.getCursor as jest.Mock).mockReturnValue({ line: 0, ch: 5 });
+
+      // Act
+      handler.convertToLink();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('[[]]');
+      expect(mockEditor.setCursor).toHaveBeenCalled();
+    });
+
+    it('should position cursor inside empty brackets', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('');
+      const cursorPos = { line: 0, ch: 5 };
+      (mockEditor.getCursor as jest.Mock).mockReturnValue(cursorPos);
+
+      // Act
+      handler.convertToLink();
+
+      // Assert
+      expect(mockEditor.setCursor).toHaveBeenCalledWith({
+        line: cursorPos.line,
+        ch: cursorPos.ch + 2, // After [[
+      });
+    });
+  });
+
+  describe('removeFormattingAndLinks', () => {
+    it('should remove [[...]] wrapping', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('[[link]]');
+
+      // Act
+      handler.removeFormattingAndLinks();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('link');
+    });
+
+    it('should remove markdown formatting', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('**bold** _italic_ ~~strike~~');
+
+      // Act
+      handler.removeFormattingAndLinks();
+
+      // Assert
+      const call = (mockEditor.replaceSelection as jest.Mock).mock.calls[0][0];
+      expect(call).toBe('bold italic strike');
+    });
+
+    it('should remove code formatting', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('`code` and `more`');
+
+      // Act
+      handler.removeFormattingAndLinks();
+
+      // Assert
+      const call = (mockEditor.replaceSelection as jest.Mock).mock.calls[0][0];
+      expect(call).toBe('code and more');
+    });
+
+    it('should handle complex formatting', () => {
+      // Arrange
+      const text = '[[**bold link**]] and _[[italic]]_';
+      (mockEditor.getSelection as jest.Mock).mockReturnValue(text);
+
+      // Act
+      handler.removeFormattingAndLinks();
+
+      // Assert
+      const call = (mockEditor.replaceSelection as jest.Mock).mock.calls[0][0];
+      expect(call).toBe('bold link and italic');
+    });
+
+    it('should not modify plain text', () => {
+      // Arrange
+      const text = 'plain text without formatting';
+      (mockEditor.getSelection as jest.Mock).mockReturnValue(text);
+
+      // Act
+      handler.removeFormattingAndLinks();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith(text);
+    });
+  });
+
+  describe('getSelectionRect', () => {
+    it('should return DOMRect of selected text', () => {
+      // Arrange
+      const mockSelection = {
+        toString: jest.fn(() => 'selected'),
+        rangeCount: 1,
+        getRangeAt: jest.fn(() => ({
+          getBoundingClientRect: jest.fn(() => ({
+            top: 100,
+            left: 50,
+            width: 100,
+            height: 20,
+            bottom: 120,
+            right: 150,
+          })),
+        })),
+      };
+
+      jest.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
+
+      // Act
+      const rect = handler.getSelectionRect();
+
+      // Assert
+      expect(rect).not.toBeNull();
+      expect(rect?.top).toBe(100);
+      expect(rect?.left).toBe(50);
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+
+    it('should return null when no selection', () => {
+      // Arrange
+      jest.spyOn(window, 'getSelection').mockReturnValue(null as any);
+
+      // Act
+      const rect = handler.getSelectionRect();
+
+      // Assert
+      expect(rect).toBeNull();
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+
+    it('should return null when empty selection', () => {
+      // Arrange
+      const mockSelection = {
+        toString: jest.fn(() => ''),
+        rangeCount: 0,
+      };
+
+      jest.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
+
+      // Act
+      const rect = handler.getSelectionRect();
+
+      // Assert
+      expect(rect).toBeNull();
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+  });
+
+  describe('getCursorRect', () => {
+    it('should return cursor position rect', () => {
+      // Arrange
+      let dummyElement: HTMLElement | null = null;
+      const mockRange = {
+        insertNode: jest.fn((node: HTMLElement) => {
+          dummyElement = node;
+        }),
+        removeChild: jest.fn(),
+      };
+
+      const mockSelection = {
+        rangeCount: 1,
+        getRangeAt: jest.fn(() => mockRange),
+      };
+
+      // Mock getBoundingClientRect to return after insertNode
+      Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+        value: jest.fn(function() {
+          return {
+            top: 100,
+            left: 50,
+            width: 0,
+            height: 20,
+            bottom: 120,
+            right: 50,
+          };
+        }),
+        configurable: true,
+      });
+
+      jest.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
+
+      // Act
+      const rect = handler.getCursorRect();
+
+      // Assert
+      expect(rect).not.toBeNull();
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+
+    it('should return null when no selection', () => {
+      // Arrange
+      jest.spyOn(window, 'getSelection').mockReturnValue(null as any);
+
+      // Act
+      const rect = handler.getCursorRect();
+
+      // Assert
+      expect(rect).toBeNull();
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+  });
+});
