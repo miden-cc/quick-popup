@@ -910,22 +910,39 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
    */
   displayButtonSettings() {
     this.containerEl.createEl("h2", { text: "Button Settings" });
-    const enabledButtons = Object.values(this.plugin.settings.buttons).sort((a, b) => a.order - b.order);
-    for (const button of enabledButtons) {
+    const buttons = Object.values(this.plugin.settings.buttons).sort((a, b) => a.order - b.order);
+    for (const button of buttons) {
       this.displayButtonSection(button);
     }
   }
   /**
-   * ボタンセクションを表示
+   * ボタンセクションを表示（折りたたみ可能）
    */
   displayButtonSection(button) {
-    const section = this.containerEl.createEl("div", {
-      cls: "quick-popup-button-section"
+    const containerDiv = this.containerEl.createEl("div", {
+      cls: "quick-popup-button-container"
     });
-    section.style.borderLeft = "3px solid #666";
-    section.style.paddingLeft = "12px";
-    section.style.marginBottom = "20px";
-    new import_obsidian.Setting(section).setName(button.tooltip).setDesc(`Button ID: ${button.id}`).addToggle(
+    containerDiv.style.marginBottom = "8px";
+    containerDiv.style.borderBottom = "1px solid var(--divider-color)";
+    const headerDiv = containerDiv.createEl("div", {
+      cls: "quick-popup-button-header"
+    });
+    headerDiv.style.display = "flex";
+    headerDiv.style.alignItems = "center";
+    headerDiv.style.padding = "12px 0";
+    headerDiv.style.cursor = "pointer";
+    headerDiv.style.userSelect = "none";
+    const dragHandle = headerDiv.createEl("span", { text: "\u2630" });
+    dragHandle.style.marginRight = "12px";
+    dragHandle.style.cursor = "grab";
+    dragHandle.style.opacity = "0.6";
+    dragHandle.style.fontSize = "16px";
+    const nameSpan = headerDiv.createEl("span", { text: button.tooltip });
+    nameSpan.style.flex = "1";
+    nameSpan.style.fontWeight = "500";
+    const toggleContainer = headerDiv.createEl("div");
+    const toggleSetting = new import_obsidian.Setting(toggleContainer);
+    toggleSetting.addToggle(
       (toggle) => toggle.setValue(button.enabled).onChange(async (value) => {
         button.enabled = value;
         await this.plugin.saveSettings();
@@ -934,8 +951,24 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
         this.display();
       })
     );
+    toggleSetting.settingEl.style.border = "none";
+    toggleSetting.settingEl.style.padding = "0";
+    const detailsDiv = containerDiv.createEl("div", {
+      cls: "quick-popup-button-details"
+    });
+    detailsDiv.style.display = "none";
+    detailsDiv.style.paddingLeft = "32px";
+    detailsDiv.style.paddingBottom = "12px";
+    let isExpanded = false;
+    headerDiv.addEventListener("click", (e) => {
+      if (e.target.closest(".setting-item"))
+        return;
+      isExpanded = !isExpanded;
+      detailsDiv.style.display = isExpanded ? "block" : "none";
+      dragHandle.style.opacity = isExpanded ? "1" : "0.6";
+    });
     if (button.enabled) {
-      new import_obsidian.Setting(section).setName("Display type").setDesc("Show as icon or text").addDropdown(
+      new import_obsidian.Setting(detailsDiv).setName("Display type").setDesc("Show as icon or text").addDropdown(
         (dropdown) => dropdown.addOption("icon", "Icon only").addOption("text", "Text only").setValue(button.displayType).onChange(async (value) => {
           button.displayType = value;
           await this.plugin.saveSettings();
@@ -945,7 +978,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
         })
       );
       if (button.displayType === "icon") {
-        new import_obsidian.Setting(section).setName("Icon").setDesc("Emoji or character to display").addText(
+        new import_obsidian.Setting(detailsDiv).setName("Icon").setDesc("Emoji or character").addText(
           (text) => text.setPlaceholder("\u{1F4CB}").setValue(button.icon).onChange(async (value) => {
             button.icon = value || "\u{1F4CB}";
             await this.plugin.saveSettings();
@@ -955,7 +988,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
         );
       }
       if (button.displayType === "text") {
-        new import_obsidian.Setting(section).setName("Label").setDesc("Text to display on button").addText(
+        new import_obsidian.Setting(detailsDiv).setName("Label").setDesc("Text to display").addText(
           (text) => text.setPlaceholder("[[]]").setValue(button.text).onChange(async (value) => {
             button.text = value || "[[]]";
             await this.plugin.saveSettings();
@@ -964,30 +997,26 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
           })
         );
       }
-      new import_obsidian.Setting(section).setName("Tooltip").setDesc("Text shown on hover").addText(
+      new import_obsidian.Setting(detailsDiv).setName("Tooltip").setDesc("Hover text").addText(
         (text) => text.setPlaceholder("Tooltip").setValue(button.tooltip).onChange(async (value) => {
           button.tooltip = value || button.tooltip;
           await this.plugin.saveSettings();
           this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
         })
       );
-      new import_obsidian.Setting(section).setName("Keyboard shortcut").setDesc("e.g., Ctrl+L, Ctrl+Shift+C").addText(
+      new import_obsidian.Setting(detailsDiv).setName("Keyboard shortcut").setDesc("e.g., Ctrl+L").addText(
         (text) => text.setPlaceholder("None").setValue(button.hotkey || "").onChange(async (value) => {
           button.hotkey = value || void 0;
           await this.plugin.saveSettings();
           this.plugin.hotkeyManager.updateHotkeys(this.plugin.settings);
         })
       );
-      const orderSection = section.createEl("div", { cls: "quick-popup-order-controls" });
-      orderSection.style.display = "flex";
-      orderSection.style.gap = "10px";
-      orderSection.style.marginTop = "10px";
-      new import_obsidian.Setting(orderSection).setName("Order").setDesc(`Position: ${button.order + 1}`).addButton(
-        (btn) => btn.setButtonText("\u2191 Move up").onClick(async () => {
+      new import_obsidian.Setting(detailsDiv).setName("Order").setDesc(`Position: ${button.order + 1}`).addButton(
+        (btn) => btn.setButtonText("\u2191").onClick(async () => {
           await this.moveButton(button.id, -1);
         })
       ).addButton(
-        (btn) => btn.setButtonText("\u2193 Move down").onClick(async () => {
+        (btn) => btn.setButtonText("\u2193").onClick(async () => {
           await this.moveButton(button.id, 1);
         })
       );

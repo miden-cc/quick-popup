@@ -49,45 +49,85 @@ export class QuickPopupSettingTab extends PluginSettingTab {
   private displayButtonSettings(): void {
     this.containerEl.createEl('h2', { text: 'Button Settings' });
 
-    const enabledButtons = (Object.values(this.plugin.settings.buttons) as ButtonConfig[])
+    const buttons = (Object.values(this.plugin.settings.buttons) as ButtonConfig[])
       .sort((a, b) => a.order - b.order);
 
-    for (const button of enabledButtons) {
+    for (const button of buttons) {
       this.displayButtonSection(button);
     }
   }
 
   /**
-   * ボタンセクションを表示
+   * ボタンセクションを表示（折りたたみ可能）
    */
   private displayButtonSection(button: ButtonConfig): void {
-    const section = this.containerEl.createEl('div', {
-      cls: 'quick-popup-button-section',
+    const containerDiv = this.containerEl.createEl('div', {
+      cls: 'quick-popup-button-container',
     });
-    section.style.borderLeft = '3px solid #666';
-    section.style.paddingLeft = '12px';
-    section.style.marginBottom = '20px';
+    containerDiv.style.marginBottom = '8px';
+    containerDiv.style.borderBottom = '1px solid var(--divider-color)';
 
-    // ボタン名と有効/無効トグル
-    new Setting(section)
-      .setName(button.tooltip)
-      .setDesc(`Button ID: ${button.id}`)
-      .addToggle((toggle) =>
-        toggle
-          .setValue(button.enabled)
-          .onChange(async (value) => {
-            button.enabled = value;
-            await this.plugin.saveSettings();
-            this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
-            this.plugin.refreshPopup();
-            this.display(); // UIを再描画
-          })
-      );
+    // ヘッダー行（ボタン名 + ON/OFF）
+    const headerDiv = containerDiv.createEl('div', {
+      cls: 'quick-popup-button-header',
+    });
+    headerDiv.style.display = 'flex';
+    headerDiv.style.alignItems = 'center';
+    headerDiv.style.padding = '12px 0';
+    headerDiv.style.cursor = 'pointer';
+    headerDiv.style.userSelect = 'none';
 
-    // 有効な場合のみ追加設定を表示
+    // ドラッグハンドル
+    const dragHandle = headerDiv.createEl('span', { text: '☰' });
+    dragHandle.style.marginRight = '12px';
+    dragHandle.style.cursor = 'grab';
+    dragHandle.style.opacity = '0.6';
+    dragHandle.style.fontSize = '16px';
+
+    // ボタン名
+    const nameSpan = headerDiv.createEl('span', { text: button.tooltip });
+    nameSpan.style.flex = '1';
+    nameSpan.style.fontWeight = '500';
+
+    // ON/OFF トグル
+    const toggleContainer = headerDiv.createEl('div');
+    const toggleSetting = new Setting(toggleContainer);
+    toggleSetting.addToggle((toggle) =>
+      toggle
+        .setValue(button.enabled)
+        .onChange(async (value) => {
+          button.enabled = value;
+          await this.plugin.saveSettings();
+          this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
+          this.plugin.refreshPopup();
+          this.display();
+        })
+    );
+    toggleSetting.settingEl.style.border = 'none';
+    toggleSetting.settingEl.style.padding = '0';
+
+    // 詳細設定セクション（デフォルトは隠す）
+    const detailsDiv = containerDiv.createEl('div', {
+      cls: 'quick-popup-button-details',
+    });
+    detailsDiv.style.display = 'none';
+    detailsDiv.style.paddingLeft = '32px';
+    detailsDiv.style.paddingBottom = '12px';
+
+    let isExpanded = false;
+
+    // ヘッダークリックで展開/折りたたみ
+    headerDiv.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.setting-item')) return;
+      isExpanded = !isExpanded;
+      detailsDiv.style.display = isExpanded ? 'block' : 'none';
+      dragHandle.style.opacity = isExpanded ? '1' : '0.6';
+    });
+
+    // 詳細設定
     if (button.enabled) {
       // 表示タイプ
-      new Setting(section)
+      new Setting(detailsDiv)
         .setName('Display type')
         .setDesc('Show as icon or text')
         .addDropdown((dropdown) =>
@@ -100,15 +140,15 @@ export class QuickPopupSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
               this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
               this.plugin.refreshPopup();
-              this.display(); // UIを再描画
+              this.display();
             })
         );
 
-      // アイコン（displayType='icon'の場合）
+      // アイコン
       if (button.displayType === 'icon') {
-        new Setting(section)
+        new Setting(detailsDiv)
           .setName('Icon')
-          .setDesc('Emoji or character to display')
+          .setDesc('Emoji or character')
           .addText((text) =>
             text
               .setPlaceholder('📋')
@@ -122,11 +162,11 @@ export class QuickPopupSettingTab extends PluginSettingTab {
           );
       }
 
-      // テキスト（displayType='text'の場合）
+      // テキスト
       if (button.displayType === 'text') {
-        new Setting(section)
+        new Setting(detailsDiv)
           .setName('Label')
-          .setDesc('Text to display on button')
+          .setDesc('Text to display')
           .addText((text) =>
             text
               .setPlaceholder('[[]]')
@@ -141,9 +181,9 @@ export class QuickPopupSettingTab extends PluginSettingTab {
       }
 
       // ツールチップ
-      new Setting(section)
+      new Setting(detailsDiv)
         .setName('Tooltip')
-        .setDesc('Text shown on hover')
+        .setDesc('Hover text')
         .addText((text) =>
           text
             .setPlaceholder('Tooltip')
@@ -155,10 +195,10 @@ export class QuickPopupSettingTab extends PluginSettingTab {
             })
         );
 
-      // キーボードショートカット
-      new Setting(section)
+      // ショートカット
+      new Setting(detailsDiv)
         .setName('Keyboard shortcut')
-        .setDesc('e.g., Ctrl+L, Ctrl+Shift+C')
+        .setDesc('e.g., Ctrl+L')
         .addText((text) =>
           text
             .setPlaceholder('None')
@@ -170,28 +210,19 @@ export class QuickPopupSettingTab extends PluginSettingTab {
             })
         );
 
-      // 表示順序変更ボタン
-      const orderSection = section.createEl('div', { cls: 'quick-popup-order-controls' });
-      orderSection.style.display = 'flex';
-      orderSection.style.gap = '10px';
-      orderSection.style.marginTop = '10px';
-
-      new Setting(orderSection)
+      // 移動ボタン
+      new Setting(detailsDiv)
         .setName('Order')
         .setDesc(`Position: ${button.order + 1}`)
         .addButton((btn) =>
-          btn
-            .setButtonText('↑ Move up')
-            .onClick(async () => {
-              await this.moveButton(button.id, -1);
-            })
+          btn.setButtonText('↑').onClick(async () => {
+            await this.moveButton(button.id, -1);
+          })
         )
         .addButton((btn) =>
-          btn
-            .setButtonText('↓ Move down')
-            .onClick(async () => {
-              await this.moveButton(button.id, 1);
-            })
+          btn.setButtonText('↓').onClick(async () => {
+            await this.moveButton(button.id, 1);
+          })
         );
     }
   }
