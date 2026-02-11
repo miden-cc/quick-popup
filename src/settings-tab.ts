@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import { QuickPopupSettings, ButtonConfig } from './types';
+import { CommandSelectorModal } from './command-selector-modal';
 
 /**
  * プラグイン設定タブ
@@ -55,6 +56,50 @@ export class QuickPopupSettingTab extends PluginSettingTab {
     for (const button of buttons) {
       this.displayButtonSection(button);
     }
+
+    // 新規ボタン追加
+    new Setting(this.containerEl)
+      .setName('Add new button')
+      .setDesc('Add a custom button that executes an Obsidian command')
+      .addButton((btn) =>
+        btn.setButtonText('+').setCta().onClick(() => {
+          this.openNewButtonFlow();
+        })
+      );
+  }
+
+  /**
+   * 新規ボタン作成フロー
+   */
+  private openNewButtonFlow(): void {
+    new CommandSelectorModal(this.app, async (command) => {
+      // 新しいボタン設定を生成
+      const existingButtons = Object.values(this.plugin.settings.buttons) as ButtonConfig[];
+      const maxOrder = existingButtons.reduce((max, b) => Math.max(max, b.order), -1);
+      const newId = `custom-${Date.now()}`;
+
+      const newButton: ButtonConfig = {
+        id: newId,
+        enabled: true,
+        displayType: 'text',
+        icon: '',
+        text: command.name.split(': ').pop() || command.name,
+        tooltip: command.name,
+        order: maxOrder + 1,
+        commandId: command.id,
+      };
+
+      // 設定に保存
+      this.plugin.settings.buttons[newId] = newButton;
+      await this.plugin.saveSettings();
+
+      // ボタン登録 (commandId で実行するアクション)
+      this.plugin.registerCommandButton(newButton);
+      this.plugin.refreshPopup();
+
+      // UI再描画
+      this.display();
+    }).open();
   }
 
   /**
@@ -195,20 +240,25 @@ export class QuickPopupSettingTab extends PluginSettingTab {
             })
         );
 
-      // ショートカット
-      new Setting(detailsDiv)
-        .setName('Keyboard shortcut')
-        .setDesc('e.g., Ctrl+L')
-        .addText((text) =>
-          text
-            .setPlaceholder('None')
-            .setValue(button.hotkey || '')
-            .onChange(async (value) => {
-              button.hotkey = value || undefined;
-              await this.plugin.saveSettings();
-              this.plugin.hotkeyManager.updateHotkeys(this.plugin.settings);
+      // コマンド表示（commandId がある場合）
+      if (button.commandId) {
+        const commandName = this.plugin.app.commands?.commands?.[button.commandId]?.name || button.commandId;
+        new Setting(detailsDiv)
+          .setName('Command')
+          .setDesc(commandName)
+          .addButton((btn) =>
+            btn.setButtonText('Change').onClick(() => {
+              new CommandSelectorModal(this.app, async (command) => {
+                button.commandId = command.id;
+                button.tooltip = command.name;
+                await this.plugin.saveSettings();
+                this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
+                this.plugin.refreshPopup();
+                this.display();
+              }).open();
             })
-        );
+          );
+      }
 
       // 移動ボタン
       new Setting(detailsDiv)

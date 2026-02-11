@@ -1,5 +1,5 @@
 import { Plugin, Editor, MarkdownView, Notice, TFile } from 'obsidian';
-import { QuickPopupSettings } from './types';
+import { QuickPopupSettings, ButtonConfig } from './types';
 import { DEFAULT_SETTINGS, migrateSettings } from './settings';
 import { ButtonRegistry } from './button-registry';
 import { HotkeyManager } from './hotkey-manager';
@@ -7,6 +7,7 @@ import { PopupManager, PopupConfig } from './popup-manager';
 import { SelectionHandler } from './selection-handler';
 import { PositionCalculator } from './position-calculator';
 import { QuickPopupSettingTab } from './settings-tab';
+import { CommandExecutor } from './command-executor';
 
 /**
  * Quick Popup プラグイン
@@ -19,6 +20,7 @@ class QuickPopupPlugin extends Plugin {
   hotkeyManager!: HotkeyManager;
   popupManager!: PopupManager;
   selectionHandler!: SelectionHandler;
+  commandExecutor!: CommandExecutor;
 
   private selectionTimeout: NodeJS.Timeout | null = null;
   private isComposing = false;
@@ -43,11 +45,15 @@ class QuickPopupPlugin extends Plugin {
     this.hotkeyManager = new HotkeyManager(this);
     this.popupManager = new PopupManager(this);
     this.selectionHandler = new SelectionHandler();
+    this.commandExecutor = new CommandExecutor(this.app);
 
     // 3. デフォルトボタンの登録
     this.registerDefaultButtons();
 
-    // 4. ホットキーの登録
+    // 4. コマンドベースのカスタムボタンを登録
+    this.registerCommandButtons();
+
+    // 5. ホットキーの登録
     this.hotkeyManager.registerAllHotkeys();
 
     // 5. 設定タブの登録
@@ -96,6 +102,34 @@ class QuickPopupPlugin extends Plugin {
       'split',
       this.settings.buttons.split,
       (plugin) => this.handleSplitText(plugin)
+    );
+  }
+
+  /**
+   * コマンドベースのカスタムボタンを一括登録
+   */
+  private registerCommandButtons() {
+    const buttons = Object.values(this.settings.buttons) as ButtonConfig[];
+    for (const button of buttons) {
+      if (button.commandId) {
+        this.registerCommandButton(button);
+      }
+    }
+  }
+
+  /**
+   * コマンドベースのボタンを1つ登録
+   */
+  registerCommandButton(button: ButtonConfig) {
+    if (!button.commandId) return;
+
+    this.buttonRegistry.register(
+      button.id,
+      button,
+      () => {
+        this.commandExecutor.execute(button.commandId!);
+        this.popupManager.hide();
+      }
     );
   }
 
