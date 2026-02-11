@@ -313,7 +313,7 @@ var require_text_splitter = __commonJS({
 });
 
 // src/main.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // src/settings.ts
 var DEFAULT_SETTINGS = {
@@ -880,8 +880,161 @@ var PositionCalculator = class {
 };
 
 // src/settings-tab.ts
+var import_obsidian2 = require("obsidian");
+
+// src/command-selector-modal.ts
 var import_obsidian = require("obsidian");
-var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
+var CommandSelectorModal = class extends import_obsidian.Modal {
+  constructor(app, onSelect) {
+    super(app);
+    this.searchQuery = "";
+    this.selectedIndex = 0;
+    this.filteredCommands = [];
+    this.onSelect = onSelect;
+  }
+  /**
+   * 全 Obsidian コマンドを取得
+   */
+  getAllCommands() {
+    const commands = this.app.commands.listCommands();
+    return commands.map((cmd) => ({
+      id: cmd.id,
+      name: cmd.name,
+      icon: cmd.icon
+    }));
+  }
+  /**
+   * コマンドをフィルタリング
+   */
+  filterCommands(query) {
+    const allCommands = this.getAllCommands();
+    if (!query || query.trim() === "") {
+      return allCommands;
+    }
+    const lowerQuery = query.toLowerCase();
+    return allCommands.filter((cmd) => {
+      return cmd.name.toLowerCase().includes(lowerQuery) || cmd.id.toLowerCase().includes(lowerQuery);
+    });
+  }
+  /**
+   * コマンドを選択
+   */
+  selectCommand(command) {
+    if (this.onSelect) {
+      this.onSelect(command);
+    }
+    this.close();
+  }
+  /**
+   * 選択を上下に移動
+   */
+  moveSelection(direction) {
+    const commands = this.getFilteredCommands();
+    const commandsLength = commands.length;
+    if (commandsLength === 0)
+      return;
+    if (direction === "down") {
+      this.selectedIndex = (this.selectedIndex + 1) % commandsLength;
+    } else {
+      this.selectedIndex = (this.selectedIndex - 1 + commandsLength) % commandsLength;
+    }
+  }
+  /**
+   * Enter キーで選択
+   */
+  handleEnterKey() {
+    const commands = this.getFilteredCommands();
+    if (commands.length > 0 && this.selectedIndex < commands.length) {
+      this.selectCommand(commands[this.selectedIndex]);
+    }
+  }
+  /**
+   * 検索クエリを設定
+   */
+  setSearchQuery(query) {
+    this.searchQuery = query;
+    this.selectedIndex = 0;
+    this.filteredCommands = this.filterCommands(query);
+  }
+  /**
+   * フィルタリングされたコマンドを取得
+   */
+  getFilteredCommands() {
+    if (this.filteredCommands.length === 0 && this.searchQuery === "") {
+      this.filteredCommands = this.filterCommands("");
+    }
+    return this.filteredCommands;
+  }
+  /**
+   * モーダルを開く
+   */
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "\u30B3\u30DE\u30F3\u30C9\u3092\u9078\u629E" });
+    const searchContainer = contentEl.createDiv("command-search-container");
+    const searchInput = searchContainer.createEl("input", {
+      type: "text",
+      placeholder: "\u30B3\u30DE\u30F3\u30C9\u3092\u691C\u7D22..."
+    });
+    searchInput.addClass("command-search-input");
+    const commandList = contentEl.createDiv("command-list");
+    const updateResults = () => {
+      this.setSearchQuery(searchInput.value);
+      this.renderCommandList(commandList);
+    };
+    searchInput.addEventListener("input", updateResults);
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        this.moveSelection("down");
+        this.renderCommandList(commandList);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        this.moveSelection("up");
+        this.renderCommandList(commandList);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        this.handleEnterKey();
+      }
+    });
+    updateResults();
+    searchInput.focus();
+  }
+  /**
+   * コマンドリストを描画
+   */
+  renderCommandList(container) {
+    container.empty();
+    const commands = this.getFilteredCommands();
+    if (commands.length === 0) {
+      container.createDiv("command-empty", (div) => {
+        div.textContent = "\u8A72\u5F53\u3059\u308B\u30B3\u30DE\u30F3\u30C9\u304C\u3042\u308A\u307E\u305B\u3093";
+      });
+      return;
+    }
+    commands.forEach((cmd, index) => {
+      const item = container.createDiv("command-item");
+      if (index === this.selectedIndex) {
+        item.addClass("is-selected");
+      }
+      item.textContent = cmd.name;
+      item.addEventListener("click", () => {
+        this.selectCommand(cmd);
+      });
+    });
+  }
+  /**
+   * モーダルを閉じる
+   */
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
+// src/settings-tab.ts
+var QuickPopupSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -897,7 +1050,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
    */
   displayGlobalSettings() {
     this.containerEl.createEl("h2", { text: "Global Settings" });
-    new import_obsidian.Setting(this.containerEl).setName("Show separators").setDesc("Display | separators between buttons").addToggle(
+    new import_obsidian2.Setting(this.containerEl).setName("Show separators").setDesc("Display | separators between buttons").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSeparators).onChange(async (value) => {
         this.plugin.settings.showSeparators = value;
         await this.plugin.saveSettings();
@@ -914,6 +1067,36 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
     for (const button of buttons) {
       this.displayButtonSection(button);
     }
+    new import_obsidian2.Setting(this.containerEl).setName("Add new button").setDesc("Add a custom button that executes an Obsidian command").addButton(
+      (btn) => btn.setButtonText("+").setCta().onClick(() => {
+        this.openNewButtonFlow();
+      })
+    );
+  }
+  /**
+   * 新規ボタン作成フロー
+   */
+  openNewButtonFlow() {
+    new CommandSelectorModal(this.app, async (command) => {
+      const existingButtons = Object.values(this.plugin.settings.buttons);
+      const maxOrder = existingButtons.reduce((max, b) => Math.max(max, b.order), -1);
+      const newId = `custom-${Date.now()}`;
+      const newButton = {
+        id: newId,
+        enabled: true,
+        displayType: "text",
+        icon: "",
+        text: command.name.split(": ").pop() || command.name,
+        tooltip: command.name,
+        order: maxOrder + 1,
+        commandId: command.id
+      };
+      this.plugin.settings.buttons[newId] = newButton;
+      await this.plugin.saveSettings();
+      this.plugin.registerCommandButton(newButton);
+      this.plugin.refreshPopup();
+      this.display();
+    }).open();
   }
   /**
    * ボタンセクションを表示（折りたたみ可能）
@@ -941,7 +1124,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
     nameSpan.style.flex = "1";
     nameSpan.style.fontWeight = "500";
     const toggleContainer = headerDiv.createEl("div");
-    const toggleSetting = new import_obsidian.Setting(toggleContainer);
+    const toggleSetting = new import_obsidian2.Setting(toggleContainer);
     toggleSetting.addToggle(
       (toggle) => toggle.setValue(button.enabled).onChange(async (value) => {
         button.enabled = value;
@@ -968,7 +1151,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
       dragHandle.style.opacity = isExpanded ? "1" : "0.6";
     });
     if (button.enabled) {
-      new import_obsidian.Setting(detailsDiv).setName("Display type").setDesc("Show as icon or text").addDropdown(
+      new import_obsidian2.Setting(detailsDiv).setName("Display type").setDesc("Show as icon or text").addDropdown(
         (dropdown) => dropdown.addOption("icon", "Icon only").addOption("text", "Text only").setValue(button.displayType).onChange(async (value) => {
           button.displayType = value;
           await this.plugin.saveSettings();
@@ -978,7 +1161,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
         })
       );
       if (button.displayType === "icon") {
-        new import_obsidian.Setting(detailsDiv).setName("Icon").setDesc("Emoji or character").addText(
+        new import_obsidian2.Setting(detailsDiv).setName("Icon").setDesc("Emoji or character").addText(
           (text) => text.setPlaceholder("\u{1F4CB}").setValue(button.icon).onChange(async (value) => {
             button.icon = value || "\u{1F4CB}";
             await this.plugin.saveSettings();
@@ -988,7 +1171,7 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
         );
       }
       if (button.displayType === "text") {
-        new import_obsidian.Setting(detailsDiv).setName("Label").setDesc("Text to display").addText(
+        new import_obsidian2.Setting(detailsDiv).setName("Label").setDesc("Text to display").addText(
           (text) => text.setPlaceholder("[[]]").setValue(button.text).onChange(async (value) => {
             button.text = value || "[[]]";
             await this.plugin.saveSettings();
@@ -997,21 +1180,29 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
           })
         );
       }
-      new import_obsidian.Setting(detailsDiv).setName("Tooltip").setDesc("Hover text").addText(
+      new import_obsidian2.Setting(detailsDiv).setName("Tooltip").setDesc("Hover text").addText(
         (text) => text.setPlaceholder("Tooltip").setValue(button.tooltip).onChange(async (value) => {
           button.tooltip = value || button.tooltip;
           await this.plugin.saveSettings();
           this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
         })
       );
-      new import_obsidian.Setting(detailsDiv).setName("Keyboard shortcut").setDesc("e.g., Ctrl+L").addText(
-        (text) => text.setPlaceholder("None").setValue(button.hotkey || "").onChange(async (value) => {
-          button.hotkey = value || void 0;
-          await this.plugin.saveSettings();
-          this.plugin.hotkeyManager.updateHotkeys(this.plugin.settings);
-        })
-      );
-      new import_obsidian.Setting(detailsDiv).setName("Order").setDesc(`Position: ${button.order + 1}`).addButton(
+      if (button.commandId) {
+        const commandName = this.plugin.app.commands?.commands?.[button.commandId]?.name || button.commandId;
+        new import_obsidian2.Setting(detailsDiv).setName("Command").setDesc(commandName).addButton(
+          (btn) => btn.setButtonText("Change").onClick(() => {
+            new CommandSelectorModal(this.app, async (command) => {
+              button.commandId = command.id;
+              button.tooltip = command.name;
+              await this.plugin.saveSettings();
+              this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
+              this.plugin.refreshPopup();
+              this.display();
+            }).open();
+          })
+        );
+      }
+      new import_obsidian2.Setting(detailsDiv).setName("Order").setDesc(`Position: ${button.order + 1}`).addButton(
         (btn) => btn.setButtonText("\u2191").onClick(async () => {
           await this.moveButton(button.id, -1);
         })
@@ -1041,8 +1232,44 @@ var QuickPopupSettingTab = class extends import_obsidian.PluginSettingTab {
   }
 };
 
+// src/command-executor.ts
+var CommandExecutor = class {
+  constructor(app) {
+    this.app = app;
+  }
+  /**
+   * コマンドを実行
+   * @returns true: 実行成功、false: 実行失敗
+   */
+  execute(commandId) {
+    if (!commandId || !this.commandExists(commandId)) {
+      return false;
+    }
+    try {
+      this.app.commands.executeCommandById(commandId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * コマンドが存在するか確認
+   */
+  commandExists(commandId) {
+    if (!commandId)
+      return false;
+    return !!this.app.commands.commands[commandId];
+  }
+  /**
+   * コマンド名を取得
+   */
+  getCommandName(commandId) {
+    return this.app.commands.commands[commandId]?.name;
+  }
+};
+
 // src/main.ts
-var QuickPopupPlugin = class extends import_obsidian2.Plugin {
+var QuickPopupPlugin = class extends import_obsidian3.Plugin {
   constructor() {
     super(...arguments);
     this.selectionTimeout = null;
@@ -1058,7 +1285,9 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
     this.hotkeyManager = new HotkeyManager(this);
     this.popupManager = new PopupManager(this);
     this.selectionHandler = new SelectionHandler();
+    this.commandExecutor = new CommandExecutor(this.app);
     this.registerDefaultButtons();
+    this.registerCommandButtons();
     this.hotkeyManager.registerAllHotkeys();
     this.addSettingTab(new QuickPopupSettingTab(this.app, this));
     this.registerEventHandlers();
@@ -1094,6 +1323,32 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
       "split",
       this.settings.buttons.split,
       (plugin) => this.handleSplitText(plugin)
+    );
+  }
+  /**
+   * コマンドベースのカスタムボタンを一括登録
+   */
+  registerCommandButtons() {
+    const buttons = Object.values(this.settings.buttons);
+    for (const button of buttons) {
+      if (button.commandId) {
+        this.registerCommandButton(button);
+      }
+    }
+  }
+  /**
+   * コマンドベースのボタンを1つ登録
+   */
+  registerCommandButton(button) {
+    if (!button.commandId)
+      return;
+    this.buttonRegistry.register(
+      button.id,
+      button,
+      () => {
+        this.commandExecutor.execute(button.commandId);
+        this.popupManager.hide();
+      }
     );
   }
   /**
@@ -1203,7 +1458,7 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
    * 選択テキストをチェックしてポップアップ表示
    */
   checkSelection() {
-    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian2.MarkdownView);
+    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (!activeView || !activeView.editor) {
       this.popupManager.hide();
       return;
@@ -1247,7 +1502,7 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
    * ボタンアクション: 内部リンクに変換
    */
   async handleConvertToLink(plugin) {
-    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian2.MarkdownView);
+    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (!activeView || !activeView.editor)
       return;
     this.selectionHandler.setEditor(activeView.editor);
@@ -1258,7 +1513,7 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
    * ボタンアクション: パスと行番号をコピー
    */
   async handleCopyPath(plugin) {
-    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian2.MarkdownView);
+    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (!activeView || !activeView.editor)
       return;
     const file = activeView.file;
@@ -1270,20 +1525,20 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
     const lineNumber = cursor.line + 1;
     const pathString = `@${filePath}:${lineNumber}`;
     await navigator.clipboard.writeText(pathString);
-    new import_obsidian2.Notice(`Copied: ${pathString}`);
+    new import_obsidian3.Notice(`Copied: ${pathString}`);
     this.popupManager.hide();
   }
   /**
    * ボタンアクション: Cosense（新規ノート作成）
    */
   async handleCosense(plugin) {
-    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian2.MarkdownView);
+    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (!activeView || !activeView.editor)
       return;
     this.selectionHandler.setEditor(activeView.editor);
     const selectedText = this.selectionHandler.getSelectedText();
     if (!selectedText) {
-      new import_obsidian2.Notice("No text selected");
+      new import_obsidian3.Notice("No text selected");
       return;
     }
     const lines = selectedText.split("\n");
@@ -1294,30 +1549,30 @@ var QuickPopupPlugin = class extends import_obsidian2.Plugin {
       const file = await this.app.vault.create(fileName, selectedText);
       const leaf = this.app.workspace.getLeaf();
       await leaf.openFile(file);
-      new import_obsidian2.Notice(`Created note: ${fileName}`);
+      new import_obsidian3.Notice(`Created note: ${fileName}`);
       this.popupManager.hide();
     } catch (error) {
       console.error("Failed to create note:", error);
-      new import_obsidian2.Notice("Failed to create note");
+      new import_obsidian3.Notice("Failed to create note");
     }
   }
   /**
    * ボタンアクション: テキストを段落に分割
    */
   async handleSplitText(plugin) {
-    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian2.MarkdownView);
+    const activeView = this.app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (!activeView || !activeView.editor)
       return;
     this.selectionHandler.setEditor(activeView.editor);
     const selectedText = this.selectionHandler.getSelectedText();
     if (!selectedText) {
-      new import_obsidian2.Notice("No text selected");
+      new import_obsidian3.Notice("No text selected");
       return;
     }
     const TextSplitter = require_text_splitter().TextSplitter;
     const splitText = TextSplitter.split(selectedText);
     activeView.editor.replaceSelection(splitText);
-    new import_obsidian2.Notice("Text split into paragraphs");
+    new import_obsidian3.Notice("Text split into paragraphs");
     this.popupManager.hide();
   }
   /**
