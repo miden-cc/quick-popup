@@ -9,7 +9,17 @@ export interface ButtonConfig {
   text: string;                  // テキストラベル（例: '[[]]'）
   tooltip: string;               // ツールチップ
   order: number;                 // 表示順序（0-based）
-  hotkey?: string;               // ショートカット（例: 'Ctrl+L'）
+  commandId?: string;            // Obsidian コマンドID（例: 'editor:fold'）
+  hotkey?: string;               // ショートカット（例: 'Ctrl+L'）[deprecated]
+}
+
+/**
+ * Obsidian コマンド情報
+ */
+export interface ObsidianCommand {
+  id: string;        // "editor:fold"
+  name: string;      // "Editor: Fold"
+  icon?: string;     // アイコン（存在する場合）
 }
 
 /**
