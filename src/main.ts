@@ -2,7 +2,6 @@ import { Plugin, Editor, MarkdownView, Notice, TFile } from 'obsidian';
 import { QuickPopupSettings, ButtonConfig } from './types';
 import { DEFAULT_SETTINGS, migrateSettings } from './settings';
 import { ButtonRegistry } from './button-registry';
-import { HotkeyManager } from './hotkey-manager';
 import { PopupManager, PopupConfig } from './popup-manager';
 import { SelectionHandler } from './selection-handler';
 import { PositionCalculator } from './position-calculator';
@@ -17,7 +16,6 @@ import { CommandExecutor } from './command-executor';
 class QuickPopupPlugin extends Plugin {
   settings!: QuickPopupSettings;
   buttonRegistry!: ButtonRegistry;
-  hotkeyManager!: HotkeyManager;
   popupManager!: PopupManager;
   selectionHandler!: SelectionHandler;
   commandExecutor!: CommandExecutor;
@@ -42,7 +40,6 @@ class QuickPopupPlugin extends Plugin {
 
     // 2. マネージャーの初期化
     this.buttonRegistry = new ButtonRegistry(this);
-    this.hotkeyManager = new HotkeyManager(this);
     this.popupManager = new PopupManager(this);
     this.selectionHandler = new SelectionHandler();
     this.commandExecutor = new CommandExecutor(this.app);
@@ -52,9 +49,6 @@ class QuickPopupPlugin extends Plugin {
 
     // 4. コマンドベースのカスタムボタンを登録
     this.registerCommandButtons();
-
-    // 5. ホットキーの登録
-    this.hotkeyManager.registerAllHotkeys();
 
     // 5. 設定タブの登録
     this.addSettingTab(new QuickPopupSettingTab(this.app, this));

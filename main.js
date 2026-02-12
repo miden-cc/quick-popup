@@ -435,87 +435,6 @@ var ButtonRegistry = class {
   }
 };
 
-// src/hotkey-manager.ts
-var HotkeyManager = class {
-  constructor(plugin) {
-    this.registeredHotkeys = /* @__PURE__ */ new Map();
-    this.plugin = plugin;
-  }
-  /**
-   * すべてのショートカットを登録
-   */
-  registerAllHotkeys() {
-    const buttons = Object.values(this.plugin.settings.buttons);
-    for (const button of buttons) {
-      if (button.hotkey && button.enabled) {
-        this.registerHotkey(button.id, button.hotkey, button.tooltip);
-      }
-    }
-  }
-  /**
-   * 個別のショートカットを登録
-   */
-  registerHotkey(buttonId, hotkeyStr, tooltip) {
-    try {
-      const hotkey = this.parseHotkey(hotkeyStr);
-      this.plugin.addCommand({
-        id: `quick-popup-${buttonId}`,
-        name: `Quick Popup: ${tooltip}`,
-        hotkeys: [hotkey],
-        editorCallback: async (editor) => {
-          await this.plugin.buttonRegistry.executeAction(buttonId, editor);
-        }
-      });
-      this.registeredHotkeys.set(buttonId, hotkeyStr);
-    } catch (error) {
-      console.error(`Failed to register hotkey for ${buttonId}:`, error);
-    }
-  }
-  /**
-   * ショートカット文字列をパース
-   * 例: "Ctrl+L" → { modifiers: ['Ctrl'], key: 'L' }
-   */
-  parseHotkey(hotkeyStr) {
-    const parts = hotkeyStr.split("+");
-    const key = parts[parts.length - 1];
-    const modifiers = parts.slice(0, -1);
-    const normalizedModifiers = modifiers.map((m) => {
-      const lower = m.toLowerCase();
-      if (lower === "ctrl")
-        return "Ctrl";
-      if (lower === "cmd")
-        return "Cmd";
-      if (lower === "alt")
-        return "Alt";
-      if (lower === "shift")
-        return "Shift";
-      return m;
-    });
-    return {
-      modifiers: normalizedModifiers,
-      key: key.length === 1 ? key.toLowerCase() : key
-    };
-  }
-  /**
-   * 設定変更時に再登録
-   */
-  updateHotkeys(settings) {
-    for (const buttonId of this.registeredHotkeys.keys()) {
-      try {
-        delete this.plugin.app.commands.commands[`quick-popup-${buttonId}`];
-      } catch (e) {
-      }
-    }
-    this.registeredHotkeys.clear();
-    const buttons = Object.values(settings.buttons);
-    for (const button of buttons) {
-      if (button.hotkey && button.enabled) {
-        this.registerHotkey(button.id, button.hotkey, button.tooltip);
-      }
-    }
-  }
-};
-
 // src/popup-manager.ts
 var PopupConfig = class _PopupConfig {
   static {
@@ -1047,7 +966,7 @@ var CommandSelectorModal = class extends import_obsidian.Modal {
 };
 
 // src/settings-tab.ts
-var DEFAULT_BUTTON_IDS = ["link", "copy", "cosense", "split"];
+var DEFAULT_BUTTON_IDS = Object.keys(DEFAULT_SETTINGS.buttons);
 var QuickPopupSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -1315,13 +1234,11 @@ var QuickPopupPlugin = class extends import_obsidian3.Plugin {
     console.log("Loading Quick Popup plugin");
     await this.loadSettings();
     this.buttonRegistry = new ButtonRegistry(this);
-    this.hotkeyManager = new HotkeyManager(this);
     this.popupManager = new PopupManager(this);
     this.selectionHandler = new SelectionHandler();
     this.commandExecutor = new CommandExecutor(this.app);
     this.registerDefaultButtons();
     this.registerCommandButtons();
-    this.hotkeyManager.registerAllHotkeys();
     this.addSettingTab(new QuickPopupSettingTab(this.app, this));
     this.registerEventHandlers();
   }

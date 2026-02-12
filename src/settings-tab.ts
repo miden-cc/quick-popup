@@ -1,11 +1,12 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import { QuickPopupSettings, ButtonConfig } from './types';
+import { DEFAULT_SETTINGS } from './settings';
 import { CommandSelectorModal } from './command-selector-modal';
 
 /**
  * プラグイン設定タブ
  */
-const DEFAULT_BUTTON_IDS = ['link', 'copy', 'cosense', 'split'];
+const DEFAULT_BUTTON_IDS = Object.keys(DEFAULT_SETTINGS.buttons);
 
 export class QuickPopupSettingTab extends PluginSettingTab {
   plugin: any;
