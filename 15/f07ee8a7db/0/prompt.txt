@@ -1,0 +1,275 @@
+Implement the following plan:
+
+# Quick Popup: Reading View対応 + ハイライト + デイリーノート連携
+
+## Context（背景）
+
+Quick Popup プラグインは現在、**編集モード（Source View）のみ**で動作する。`checkSelection()` が `MarkdownView.editor` を必須としているため、Reading View（プレビュー）でテキストを選択してもポップアップが表示されない。
+
+ユーザーの要望：
+1. **Reading View（ウェブビューワ）でもポップアップを動作させる**
+2. **ハイライト機能**: 選択テキストをデイリーノートに `- HH:mm ハイライト文字` 形式で保存
+3. **リンク機能の強化**: リンク作成時にノートが既にあれば既存リンクに紐付き、色が変わる
+
+### 技術的発見
+
+調査の結果：
+- Obsidian はiframeではなく同一DOM内でReading Viewをレンダリングする
+- `window.getSelection()` はReading Viewでも動作する（位置取得・テキスト取得両方OK）
+- `MarkdownView` はReading Viewでも取得可能（`activeView.getMode()` で判別）
+- `vault.append()` でファイル末尾にテキスト追加可能
+- `vault.process()` でソースの原子的な読み書き可能
+- `moment` はObsidianからexportされている
+
+## 実装計画
+
+### 未コミットの作業
+
+i18n実装が完了済み（テスト228パス、ビルド成功）だが未コミット。まずこれをコミットする。
+
+### フェーズ1: SelectionHandler のReading View対応
+
+**目的**: エディターなしでもテキスト選択を取得できるようにする
+
+**変更ファイル**: `src/selection-handler.ts`
+
+1. `getSelectedText()` を修正：エディターがない場合 `window.getSelection().toString()` にフォールバック
+2. `hasValidSelection()` も同様にフォールバック対応
+3. 新メソッド `clearEditor()` 追加（Reading View時にエディター参照をクリア）
+
+```typescript
+// 変更後
+getSelectedText(): string {
+  if (this.editor) {
+    return this.editor.getSelection() || '';
+  }
+  // Reading View: DOMから取得
+  return window.getSelection()?.toString() || '';
+}
+```
+
+### フェーズ2: main.ts の checkSelection() 修正
+
+**目的**: Reading Viewでもポップアップを表示する
+
+**変更ファイル**: `src/main.ts`
+
+1. `checkSelection()` を修正：
+   - `MarkdownView` が取得できない、またはエディターがない場合でも動作
+   - Reading View判定：`activeView?.getMode() === 'preview'`
+   - Reading Viewの場合、`selectionHandler` をエディターなしモードで使用
+
+```typescript
+private checkSelection() {
+  const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+  if (!activeView) {
+    this.popupManager.hide();
+    return;
+  }
+
+  const isReadingView = activeView.getMode() === 'preview';
+
+  if (isReadingView) {
+    this.selectionHandler.clearEditor();
+  } else if (activeView.editor) {
+    this.selectionHandler.setEditor(activeView.editor);
+  } else {
+    this.popupManager.hide();
+    return;
+  }
+
+  // 以降は共通ロジック（変更なし）
+  if (!this.selectionHandler.hasValidSelection()) { ... }
+  ...
+}
+```
+
+### フェーズ3: PopupManager のボタンクリック修正
+
+**目的**: エディターなしでもボタンアクションを実行可能にする
+
+**変更ファイル**: `src/popup-manager.ts`
+
+1. `createButton()` のクリックハンドラを修正：
+   - エディターがなくてもアクションを実行（nullを渡す）
+   - 各アクション側でエディター有無を判断
+
+```typescript
+button.addEventListener('click', async () => {
+  await this.plugin.buttonRegistry.executeAction(config.id, null);
+});
+```
+
+2. `ButtonRegistry.executeAction()` のシグネチャを `editor: Editor | null` に変更
+
+### フェーズ4: ハイライトボタン（デイリーノート連携）
+
+**目的**: 選択テキストをタイムスタンプ付きでデイリーノートに保存
+
+**変更ファイル**: `src/main.ts`, `src/settings.ts`, `src/types.ts`, `src/i18n.ts`
+
+1. **新デフォルトボタン「highlight」を追加** (`settings.ts`):
+   ```typescript
+   highlight: {
+     id: 'highlight',
+     enabled: true,
+     displayType: 'icon',
+     icon: '🖍️',
+     text: 'Highlight',
+     tooltip: 'Save highlight to daily note',
+     order: 4,
+   }
+   ```
+
+2. **デイリーノート設定を追加** (`types.ts`):
+   ```typescript
+   interface QuickPopupSettings {
+     // 既存フィールド...
+     dailyNotePath: string;  // デフォルト: 'Daily Notes/YYYY-MM-DD.md'
+   }
+   ```
+
+3. **`handleHighlight()` を実装** (`main.ts`):
+   ```typescript
+   private async handleHighlight() {
+     const selectedText = this.selectionHandler.getSelectedText();
+     if (!selectedText) return;
+
+     const { moment } = require('obsidian');
+     const now = moment();
+     const time = now.format('HH:mm');
+     const entry = `- ${time} ${selectedText}`;
+
+     // デイリーノートのパスを生成
+     const dailyPath = now.format(this.settings.dailyNotePath);
+
+     // ファイル取得 or 作成
+     let file = this.app.vault.getFileByPath(dailyPath);
+     if (!file) {
+       file = await this.app.vault.create(dailyPath, '');
+     }
+
+     await this.app.vault.append(file, '\n' + entry);
+     new Notice(this.i18n.t('highlightSaved'));
+     this.popupManager.hide();
+   }
+   ```
+
+4. **i18n文字列追加** (`i18n.ts`):
+   - `highlightSaved`: 'Saved highlight to daily note' / 'デイリーノートにハイライトを保存しました'
+   - `dailyNotePath`: 'Daily note path' / 'デイリーノートのパス'
+   - `dailyNotePathDesc`: 'Path format using moment.js (e.g., Daily Notes/YYYY-MM-DD.md)' / '...'
+
+### フェーズ5: リンクボタンのReading View対応
+
+**目的**: Reading Viewでもリンク作成を可能にする
+
+**変更ファイル**: `src/main.ts`, `src/selection-handler.ts`
+
+1. `handleConvertToLink()` を修正：
+   - エディターがある場合：既存の `convertToLink()` を使用（変更なし）
+   - エディターがない場合（Reading View）：
+     a. `window.getSelection().toString()` でテキスト取得
+     b. `vault.process()` でソースファイル内の該当テキストを `[[text]]` に置換
+     c. Obsidianが自動的にプレビューを再レンダリング → リンク色に変わる
+
+```typescript
+private async handleConvertToLink() {
+  const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+  if (!activeView) return;
+
+  if (activeView.editor) {
+    // 編集モード：既存ロジック
+    this.selectionHandler.setEditor(activeView.editor);
+    this.selectionHandler.convertToLink();
+  } else {
+    // Reading View：ソースを直接修正
+    const selectedText = window.getSelection()?.toString()?.trim();
+    if (!selectedText || !activeView.file) return;
+
+    await this.app.vault.process(activeView.file, (content) => {
+      // 最初に見つかったマッチを置換
+      return content.replace(selectedText, `[[${selectedText}]]`);
+    });
+  }
+
+  this.popupManager.hide();
+}
+```
+
+2. **リンクの色変化について**:
+   - Obsidianが `[[text]]` を自動的にリンクとしてレンダリング
+   - 既存ファイルへのリンク → 通常のリンク色（紫/青）
+   - 存在しないファイルへのリンク → 薄い色（Obsidianのデフォルト動作）
+   - **追加実装不要** — Obsidianのネイティブ動作がそのまま要件を満たす
+
+### フェーズ6: 設定UIの更新
+
+**変更ファイル**: `src/settings-tab.ts`
+
+1. デイリーノートパス設定フィールドを追加
+2. ハイライトボタンの設定セクション
+
+### フェーズ7: テスト（TDD）
+
+**新規/変更テスト**:
+- `selection-handler.test.ts`: DOMフォールバックテスト追加
+- `i18n.test.ts`: 新しい翻訳キーのテスト
+- `settings.test.ts`: dailyNotePath マイグレーションテスト
+
+## 重要ファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `src/selection-handler.ts` | DOMフォールバック追加 |
+| `src/main.ts` | checkSelection修正、handleHighlight追加、handleConvertToLink修正 |
+| `src/popup-manager.ts` | ボタンクリックハンドラ修正 |
+| `src/button-registry.ts` | executeAction シグネチャ変更 |
+| `src/settings.ts` | highlight ボタン + dailyNotePath デフォルト追加 |
+| `src/types.ts` | dailyNotePath フィールド追加 |
+| `src/i18n.ts` | 新翻訳キー追加 |
+| `src/settings-tab.ts` | デイリーノート設定UI追加 |
+
+## 検証方法
+
+1. **ビルド**: `npm run build` — エラーなし
+2. **テスト**: `npx jest` — 全パス
+3. **Obsidian動作確認**:
+   - Reading Viewでテキスト選択 → ポップアップ表示
+   - ハイライトボタン → デイリーノートに `- HH:mm テキスト` 追加
+   - リンクボタン（Reading View） → ソースに `[[text]]` が挿入され、プレビューでリンク色に変化
+   - リンクボタン（編集モード） → 既存動作と同じ
+   - 既存のノートへのリンク → Obsidianが自動的に紐付け
+
+## 実装順序
+
+1. i18nコミット（未コミット作業）
+2. フェーズ1-2: Reading View基本対応
+3. フェーズ3: ボタンクリック修正
+4. フェーズ4: ハイライト機能
+5. フェーズ5: リンクのReading View対応
+6. フェーズ6-7: 設定UI + テスト
+7. ビルド＆コミット
+
+
+If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/pancake/.REDACTED.jsonl
+
+---
+
+Unknown skill: rate-limit-options
+
+---
+
+確認して
+
+---
+
+残りのものは何か
+
+---
+
+browserからのハイライトやリンクもできてるの
+
+---
+
+y
