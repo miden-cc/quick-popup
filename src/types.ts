@@ -10,7 +10,6 @@ export interface ButtonConfig {
   tooltip: string;               // ツールチップ
   order: number;                 // 表示順序（0-based）
   commandId?: string;            // Obsidian コマンドID（例: 'editor:fold'）
-  hotkey?: string;               // ショートカット（例: 'Ctrl+L'）[deprecated]
 }
 
 /**

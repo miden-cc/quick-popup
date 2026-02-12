@@ -24,6 +24,13 @@ export class ButtonRegistry {
   }
 
   /**
+   * ボタンを登録解除
+   */
+  unregister(id: string): boolean {
+    return this.buttons.delete(id);
+  }
+
+  /**
    * 有効なボタンをorder順で取得
    */
   getEnabledButtons(): RegisteredButton[] {

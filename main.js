@@ -327,8 +327,7 @@ var DEFAULT_SETTINGS = {
       icon: "\u{1F517}",
       text: "[[]]",
       tooltip: "Convert to internal link",
-      order: 0,
-      hotkey: void 0
+      order: 0
     },
     copy: {
       id: "copy",
@@ -337,8 +336,7 @@ var DEFAULT_SETTINGS = {
       icon: "\u{1F4CB}",
       text: "Copy",
       tooltip: "Copy path and line number",
-      order: 1,
-      hotkey: "Ctrl+C"
+      order: 1
     },
     cosense: {
       id: "cosense",
@@ -347,8 +345,7 @@ var DEFAULT_SETTINGS = {
       icon: "\u2702\uFE0F",
       text: "Cosense",
       tooltip: "Create new note from selection (Cosense)",
-      order: 2,
-      hotkey: void 0
+      order: 2
     },
     split: {
       id: "split",
@@ -357,16 +354,26 @@ var DEFAULT_SETTINGS = {
       icon: "\u{1F9E9}",
       text: "Split",
       tooltip: "Split text into paragraphs",
-      order: 3,
-      hotkey: void 0
+      order: 3
     }
   }
 };
 function migrateSettings(oldSettings) {
-  if (oldSettings.version === 1) {
-    return oldSettings;
+  if (!oldSettings) {
+    return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
   }
-  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  const result = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  if (typeof oldSettings.showSeparators === "boolean") {
+    result.showSeparators = oldSettings.showSeparators;
+  }
+  if (oldSettings.buttons) {
+    for (const [id, button] of Object.entries(oldSettings.buttons)) {
+      const btn = { ...button };
+      delete btn.hotkey;
+      result.buttons[id] = btn;
+    }
+  }
+  return result;
 }
 
 // src/button-registry.ts
@@ -380,6 +387,12 @@ var ButtonRegistry = class {
    */
   register(id, config, action) {
     this.buttons.set(id, { config, action });
+  }
+  /**
+   * ボタンを登録解除
+   */
+  unregister(id) {
+    return this.buttons.delete(id);
   }
   /**
    * 有効なボタンをorder順で取得
@@ -1034,6 +1047,7 @@ var CommandSelectorModal = class extends import_obsidian.Modal {
 };
 
 // src/settings-tab.ts
+var DEFAULT_BUTTON_IDS = ["link", "copy", "cosense", "split"];
 var QuickPopupSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -1211,7 +1225,26 @@ var QuickPopupSettingTab = class extends import_obsidian2.PluginSettingTab {
           await this.moveButton(button.id, 1);
         })
       );
+      if (!DEFAULT_BUTTON_IDS.includes(button.id)) {
+        new import_obsidian2.Setting(detailsDiv).setName("Delete button").setDesc("Remove this custom button permanently").addButton(
+          (btn) => btn.setButtonText("Delete").setWarning().onClick(async () => {
+            await this.deleteButton(button.id);
+          })
+        );
+      }
     }
+  }
+  /**
+   * カスタムボタンを削除
+   */
+  async deleteButton(buttonId) {
+    if (DEFAULT_BUTTON_IDS.includes(buttonId))
+      return;
+    delete this.plugin.settings.buttons[buttonId];
+    this.plugin.buttonRegistry.unregister(buttonId);
+    await this.plugin.saveSettings();
+    this.plugin.refreshPopup();
+    this.display();
   }
   /**
    * ボタンの順序を変更

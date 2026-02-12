@@ -15,7 +15,6 @@ export const DEFAULT_SETTINGS: QuickPopupSettings = {
       text: '[[]]',
       tooltip: 'Convert to internal link',
       order: 0,
-      hotkey: undefined,
     },
     copy: {
       id: 'copy',
@@ -25,7 +24,6 @@ export const DEFAULT_SETTINGS: QuickPopupSettings = {
       text: 'Copy',
       tooltip: 'Copy path and line number',
       order: 1,
-      hotkey: 'Ctrl+C',
     },
     cosense: {
       id: 'cosense',
@@ -35,7 +33,6 @@ export const DEFAULT_SETTINGS: QuickPopupSettings = {
       text: 'Cosense',
       tooltip: 'Create new note from selection (Cosense)',
       order: 2,
-      hotkey: undefined,
     },
     split: {
       id: 'split',
@@ -45,7 +42,6 @@ export const DEFAULT_SETTINGS: QuickPopupSettings = {
       text: 'Split',
       tooltip: 'Split text into paragraphs',
       order: 3,
-      hotkey: undefined,
     },
   },
 };
@@ -54,10 +50,27 @@ export const DEFAULT_SETTINGS: QuickPopupSettings = {
  * ボタン設定を新しいフォーマットにマイグレーション
  */
 export function migrateSettings(oldSettings: any): QuickPopupSettings {
-  if (oldSettings.version === 1) {
-    return oldSettings;
+  if (!oldSettings) {
+    return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
   }
 
-  // デフォルト設定で初期化
-  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  // ベースをデフォルト設定から作成
+  const result: QuickPopupSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+  // showSeparators を保持
+  if (typeof oldSettings.showSeparators === 'boolean') {
+    result.showSeparators = oldSettings.showSeparators;
+  }
+
+  // 既存ボタン設定をマージ
+  if (oldSettings.buttons) {
+    for (const [id, button] of Object.entries(oldSettings.buttons)) {
+      const btn = { ...(button as any) };
+      // deprecated hotkey フィールドを削除
+      delete btn.hotkey;
+      result.buttons[id] = btn;
+    }
+  }
+
+  return result;
 }

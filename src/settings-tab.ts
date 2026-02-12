@@ -5,6 +5,8 @@ import { CommandSelectorModal } from './command-selector-modal';
 /**
  * プラグイン設定タブ
  */
+const DEFAULT_BUTTON_IDS = ['link', 'copy', 'cosense', 'split'];
+
 export class QuickPopupSettingTab extends PluginSettingTab {
   plugin: any;
 
@@ -274,7 +276,35 @@ export class QuickPopupSettingTab extends PluginSettingTab {
             await this.moveButton(button.id, 1);
           })
         );
+
+      // 削除ボタン（カスタムボタンのみ）
+      if (!DEFAULT_BUTTON_IDS.includes(button.id)) {
+        new Setting(detailsDiv)
+          .setName('Delete button')
+          .setDesc('Remove this custom button permanently')
+          .addButton((btn) =>
+            btn
+              .setButtonText('Delete')
+              .setWarning()
+              .onClick(async () => {
+                await this.deleteButton(button.id);
+              })
+          );
+      }
     }
+  }
+
+  /**
+   * カスタムボタンを削除
+   */
+  private async deleteButton(buttonId: string): Promise<void> {
+    if (DEFAULT_BUTTON_IDS.includes(buttonId)) return;
+
+    delete this.plugin.settings.buttons[buttonId];
+    this.plugin.buttonRegistry.unregister(buttonId);
+    await this.plugin.saveSettings();
+    this.plugin.refreshPopup();
+    this.display();
   }
 
   /**

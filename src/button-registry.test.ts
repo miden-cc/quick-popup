@@ -648,6 +648,83 @@ describe('ButtonRegistry - ボタン登録・管理システム', () => {
     });
   });
 
+  describe('unregister', () => {
+    it('should remove a registered button', () => {
+      const config: ButtonConfig = {
+        id: 'custom-1',
+        enabled: true,
+        displayType: 'text',
+        icon: '',
+        text: 'Custom',
+        tooltip: 'Custom button',
+        order: 5,
+        commandId: 'editor:fold',
+      };
+      registry.register('custom-1', config, jest.fn());
+
+      // Act
+      const result = registry.unregister('custom-1');
+
+      // Assert
+      expect(result).toBe(true);
+      expect(registry.getButtonConfig('custom-1')).toBeUndefined();
+    });
+
+    it('should return false when button does not exist', () => {
+      const result = registry.unregister('nonexistent');
+      expect(result).toBe(false);
+    });
+
+    it('should not affect other buttons', () => {
+      const config1: ButtonConfig = {
+        id: 'link',
+        enabled: true,
+        displayType: 'text',
+        icon: '[[]]',
+        text: 'Link',
+        tooltip: 'Link',
+        order: 0,
+      };
+      const config2: ButtonConfig = {
+        id: 'custom-1',
+        enabled: true,
+        displayType: 'text',
+        icon: '',
+        text: 'Custom',
+        tooltip: 'Custom',
+        order: 5,
+        commandId: 'editor:fold',
+      };
+      registry.register('link', config1, jest.fn());
+      registry.register('custom-1', config2, jest.fn());
+
+      registry.unregister('custom-1');
+
+      expect(registry.getButtonConfig('link')).toBeDefined();
+      expect(registry.getAllButtons().length).toBe(1);
+    });
+
+    it('should remove button from getEnabledButtons', () => {
+      const config: ButtonConfig = {
+        id: 'custom-1',
+        enabled: true,
+        displayType: 'text',
+        icon: '',
+        text: 'Custom',
+        tooltip: 'Custom',
+        order: 5,
+        commandId: 'editor:fold',
+      };
+      registry.register('custom-1', config, jest.fn());
+
+      expect(registry.getEnabledButtons().length).toBe(1);
+
+      registry.unregister('custom-1');
+
+      expect(registry.getEnabledButtons().length).toBe(0);
+    });
+  });
+
   describe('getButtonConfig', () => {
     it('should return button config for registered button', () => {
       // Arrange
