@@ -51,7 +51,7 @@ export class ButtonRegistry {
   /**
    * ボタンアクションを実行
    */
-  async executeAction(id: string, editor: Editor): Promise<void> {
+  async executeAction(id: string, editor: Editor | null): Promise<void> {
     const button = this.buttons.get(id);
     if (button) {
       await Promise.resolve(button.action(this.plugin));

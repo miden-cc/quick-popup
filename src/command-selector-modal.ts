@@ -6,16 +6,19 @@
 
 import { App, Modal } from 'obsidian';
 import { ObsidianCommand } from './types';
+import { I18n } from './i18n';
 
 export class CommandSelectorModal extends Modal {
   private onSelect: (command: ObsidianCommand) => void;
   private searchQuery = '';
   public selectedIndex = 0;
   private filteredCommands: ObsidianCommand[] = [];
+  private i18n?: I18n;
 
-  constructor(app: App, onSelect: (command: ObsidianCommand) => void) {
+  constructor(app: App, onSelect: (command: ObsidianCommand) => void, i18n?: I18n) {
     super(app);
     this.onSelect = onSelect;
+    this.i18n = i18n;
   }
 
   /**
@@ -112,13 +115,13 @@ export class CommandSelectorModal extends Modal {
     contentEl.empty();
 
     // タイトル
-    contentEl.createEl('h2', { text: 'コマンドを選択' });
+    contentEl.createEl('h2', { text: this.i18n?.t('selectCommand') ?? 'Select command' });
 
     // 検索ボックス
     const searchContainer = contentEl.createDiv('command-search-container');
     const searchInput = searchContainer.createEl('input', {
       type: 'text',
-      placeholder: 'コマンドを検索...',
+      placeholder: this.i18n?.t('searchCommands') ?? 'Search commands...',
     });
     searchInput.addClass('command-search-input');
 
@@ -164,7 +167,7 @@ export class CommandSelectorModal extends Modal {
 
     if (commands.length === 0) {
       container.createDiv('command-empty', (div) => {
-        div.textContent = '該当するコマンドがありません';
+        div.textContent = this.i18n?.t('noMatchingCommands') ?? 'No matching commands';
       });
       return;
     }

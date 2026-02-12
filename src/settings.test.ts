@@ -13,6 +13,7 @@ describe('migrateSettings - 設定マイグレーション', () => {
       const v1Settings: QuickPopupSettings = {
         version: 1,
         showSeparators: true,
+        locale: 'en',
         buttons: {
           link: { ...DEFAULT_SETTINGS.buttons.link },
         },
@@ -31,7 +32,7 @@ describe('migrateSettings - 設定マイグレーション', () => {
 
       expect(result.version).toBe(1);
       expect(result.showSeparators).toBe(true);
-      expect(Object.keys(result.buttons)).toEqual(['link', 'copy', 'cosense', 'split']);
+      expect(Object.keys(result.buttons)).toEqual(['link', 'copy', 'cosense', 'split', 'highlight', 'dailynote']);
     });
 
     it('should return defaults for null', () => {

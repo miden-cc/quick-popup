@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import { QuickPopupSettings, ButtonConfig } from './types';
 import { DEFAULT_SETTINGS } from './settings';
+import { I18n } from './i18n';
 import { CommandSelectorModal } from './command-selector-modal';
 
 /**
@@ -16,12 +17,19 @@ export class QuickPopupSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  private get i18n(): I18n {
+    return this.plugin.i18n;
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
     // グローバル設定
     this.displayGlobalSettings();
+
+    // デイリーノート設定
+    this.displayDailyNoteSettings();
 
     // ボタン設定
     this.displayButtonSettings();
@@ -31,11 +39,28 @@ export class QuickPopupSettingTab extends PluginSettingTab {
    * グローバル設定を表示
    */
   private displayGlobalSettings(): void {
-    this.containerEl.createEl('h2', { text: 'Global Settings' });
+    this.containerEl.createEl('h2', { text: this.i18n.t('globalSettings') });
+
+    // 言語設定
+    new Setting(this.containerEl)
+      .setName(this.i18n.t('language'))
+      .setDesc(this.i18n.t('languageDesc'))
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption('en', 'English')
+          .addOption('ja', '日本語')
+          .setValue(this.plugin.settings.locale)
+          .onChange(async (value) => {
+            this.plugin.settings.locale = value as 'en' | 'ja';
+            this.plugin.i18n.setLocale(value);
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
 
     new Setting(this.containerEl)
-      .setName('Show separators')
-      .setDesc('Display | separators between buttons')
+      .setName(this.i18n.t('showSeparators'))
+      .setDesc(this.i18n.t('showSeparatorsDesc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.showSeparators)
@@ -48,10 +73,43 @@ export class QuickPopupSettingTab extends PluginSettingTab {
   }
 
   /**
+   * デイリーノート設定を表示
+   */
+  private displayDailyNoteSettings(): void {
+    this.containerEl.createEl('h2', { text: this.i18n.t('dailyNoteSettings') });
+
+    new Setting(this.containerEl)
+      .setName(this.i18n.t('dailyNotePath'))
+      .setDesc(this.i18n.t('dailyNotePathDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('Daily')
+          .setValue(this.plugin.settings.dailyNotePath || '')
+          .onChange(async (value) => {
+            this.plugin.settings.dailyNotePath = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(this.containerEl)
+      .setName(this.i18n.t('dailyNoteFormat'))
+      .setDesc(this.i18n.t('dailyNoteFormatDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('YYYY-MM-DD')
+          .setValue(this.plugin.settings.dailyNoteFormat || '')
+          .onChange(async (value) => {
+            this.plugin.settings.dailyNoteFormat = value;
+            await this.plugin.saveSettings();
+          })
+      );
+  }
+
+  /**
    * ボタン設定を表示
    */
   private displayButtonSettings(): void {
-    this.containerEl.createEl('h2', { text: 'Button Settings' });
+    this.containerEl.createEl('h2', { text: this.i18n.t('buttonSettings') });
 
     const buttons = (Object.values(this.plugin.settings.buttons) as ButtonConfig[])
       .sort((a, b) => a.order - b.order);
@@ -62,8 +120,8 @@ export class QuickPopupSettingTab extends PluginSettingTab {
 
     // 新規ボタン追加
     new Setting(this.containerEl)
-      .setName('Add new button')
-      .setDesc('Add a custom button that executes an Obsidian command')
+      .setName(this.i18n.t('addNewButton'))
+      .setDesc(this.i18n.t('addNewButtonDesc'))
       .addButton((btn) =>
         btn.setButtonText('+').setCta().onClick(() => {
           this.openNewButtonFlow();
@@ -102,7 +160,7 @@ export class QuickPopupSettingTab extends PluginSettingTab {
 
       // UI再描画
       this.display();
-    }).open();
+    }, this.i18n).open();
   }
 
   /**
@@ -176,12 +234,12 @@ export class QuickPopupSettingTab extends PluginSettingTab {
     if (button.enabled) {
       // 表示タイプ
       new Setting(detailsDiv)
-        .setName('Display type')
-        .setDesc('Show as icon or text')
+        .setName(this.i18n.t('displayType'))
+        .setDesc(this.i18n.t('displayTypeDesc'))
         .addDropdown((dropdown) =>
           dropdown
-            .addOption('icon', 'Icon only')
-            .addOption('text', 'Text only')
+            .addOption('icon', this.i18n.t('iconOnly'))
+            .addOption('text', this.i18n.t('textOnly'))
             .setValue(button.displayType)
             .onChange(async (value) => {
               button.displayType = value as 'icon' | 'text';
@@ -195,8 +253,8 @@ export class QuickPopupSettingTab extends PluginSettingTab {
       // アイコン
       if (button.displayType === 'icon') {
         new Setting(detailsDiv)
-          .setName('Icon')
-          .setDesc('Emoji or character')
+          .setName(this.i18n.t('icon'))
+          .setDesc(this.i18n.t('iconDesc'))
           .addText((text) =>
             text
               .setPlaceholder('📋')
@@ -213,8 +271,8 @@ export class QuickPopupSettingTab extends PluginSettingTab {
       // テキスト
       if (button.displayType === 'text') {
         new Setting(detailsDiv)
-          .setName('Label')
-          .setDesc('Text to display')
+          .setName(this.i18n.t('label'))
+          .setDesc(this.i18n.t('labelDesc'))
           .addText((text) =>
             text
               .setPlaceholder('[[]]')
@@ -230,11 +288,11 @@ export class QuickPopupSettingTab extends PluginSettingTab {
 
       // ツールチップ
       new Setting(detailsDiv)
-        .setName('Tooltip')
-        .setDesc('Hover text')
+        .setName(this.i18n.t('tooltip'))
+        .setDesc(this.i18n.t('tooltipDesc'))
         .addText((text) =>
           text
-            .setPlaceholder('Tooltip')
+            .setPlaceholder(this.i18n.t('tooltip'))
             .setValue(button.tooltip)
             .onChange(async (value) => {
               button.tooltip = value || button.tooltip;
@@ -247,10 +305,10 @@ export class QuickPopupSettingTab extends PluginSettingTab {
       if (button.commandId) {
         const commandName = this.plugin.app.commands?.commands?.[button.commandId]?.name || button.commandId;
         new Setting(detailsDiv)
-          .setName('Command')
+          .setName(this.i18n.t('command'))
           .setDesc(commandName)
           .addButton((btn) =>
-            btn.setButtonText('Change').onClick(() => {
+            btn.setButtonText(this.i18n.t('change')).onClick(() => {
               new CommandSelectorModal(this.app, async (command) => {
                 button.commandId = command.id;
                 button.tooltip = command.name;
@@ -258,15 +316,15 @@ export class QuickPopupSettingTab extends PluginSettingTab {
                 this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
                 this.plugin.refreshPopup();
                 this.display();
-              }).open();
+              }, this.i18n).open();
             })
           );
       }
 
       // 移動ボタン
       new Setting(detailsDiv)
-        .setName('Order')
-        .setDesc(`Position: ${button.order + 1}`)
+        .setName(this.i18n.t('order'))
+        .setDesc(this.i18n.t('position', { n: String(button.order + 1) }))
         .addButton((btn) =>
           btn.setButtonText('↑').onClick(async () => {
             await this.moveButton(button.id, -1);
@@ -281,11 +339,11 @@ export class QuickPopupSettingTab extends PluginSettingTab {
       // 削除ボタン（カスタムボタンのみ）
       if (!DEFAULT_BUTTON_IDS.includes(button.id)) {
         new Setting(detailsDiv)
-          .setName('Delete button')
-          .setDesc('Remove this custom button permanently')
+          .setName(this.i18n.t('deleteButton'))
+          .setDesc(this.i18n.t('deleteButtonDesc'))
           .addButton((btn) =>
             btn
-              .setButtonText('Delete')
+              .setButtonText(this.i18n.t('delete'))
               .setWarning()
               .onClick(async () => {
                 await this.deleteButton(button.id);
@@ -328,6 +386,6 @@ export class QuickPopupSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings();
     this.plugin.buttonRegistry.updateConfigs(this.plugin.settings);
     this.plugin.refreshPopup();
-    this.display(); // UIを再描画
+    this.display();
   }
 }

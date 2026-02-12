@@ -348,4 +348,184 @@ describe('SelectionHandler - テキスト選択処理', () => {
       (window.getSelection as jest.Mock).mockRestore();
     });
   });
+
+  describe('toggleHighlight', () => {
+    it('should add == markers to selected text', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('important text');
+
+      // Act
+      handler.toggleHighlight();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('==important text==');
+    });
+
+    it('should remove == markers from already highlighted text', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('==highlighted==');
+
+      // Act
+      handler.toggleHighlight();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('highlighted');
+    });
+
+    it('should do nothing when no editor is set', () => {
+      // Arrange
+      handler.setEditor(null as any);
+
+      // Act
+      handler.toggleHighlight();
+
+      // Assert
+      expect(mockEditor.replaceSelection).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing when no text is selected', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('');
+
+      // Act
+      handler.toggleHighlight();
+
+      // Assert
+      expect(mockEditor.replaceSelection).not.toHaveBeenCalled();
+    });
+
+    it('should handle text with == inside but not wrapping', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('a == b');
+
+      // Act
+      handler.toggleHighlight();
+
+      // Assert
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('==a == b==');
+    });
+  });
+
+  describe('formatAsLink', () => {
+    it('should wrap plain text with [[...]]', () => {
+      const result = handler.formatAsLink('my note');
+      expect(result).toBe('[[my note]]');
+    });
+
+    it('should clean existing brackets before wrapping', () => {
+      const result = handler.formatAsLink('[[already linked]]');
+      expect(result).toBe('[[already linked]]');
+    });
+
+    it('should handle partial brackets', () => {
+      const result = handler.formatAsLink('[partial]');
+      expect(result).toBe('[[partial]]');
+    });
+
+    it('should handle empty string', () => {
+      const result = handler.formatAsLink('');
+      expect(result).toBe('[[]]');
+    });
+
+    it('should handle nested brackets', () => {
+      const result = handler.formatAsLink('[[nested [text]]]');
+      expect(result).toBe('[[nested text]]');
+    });
+  });
+
+  describe('formatAsPlain', () => {
+    it('should remove bold formatting', () => {
+      const result = handler.formatAsPlain('**bold**');
+      expect(result).toBe('bold');
+    });
+
+    it('should remove italic formatting', () => {
+      const result = handler.formatAsPlain('_italic_');
+      expect(result).toBe('italic');
+    });
+
+    it('should remove strikethrough formatting', () => {
+      const result = handler.formatAsPlain('~~strike~~');
+      expect(result).toBe('strike');
+    });
+
+    it('should remove highlight markers', () => {
+      const result = handler.formatAsPlain('==highlighted==');
+      expect(result).toBe('highlighted');
+    });
+
+    it('should remove code backticks', () => {
+      const result = handler.formatAsPlain('`code`');
+      expect(result).toBe('code');
+    });
+
+    it('should remove link brackets', () => {
+      const result = handler.formatAsPlain('[[link]]');
+      expect(result).toBe('link');
+    });
+
+    it('should remove all formatting at once', () => {
+      const result = handler.formatAsPlain('**[[bold link]]** and _~~italic strike~~_');
+      expect(result).toBe('bold link and italic strike');
+    });
+
+    it('should preserve plain text', () => {
+      const result = handler.formatAsPlain('plain text');
+      expect(result).toBe('plain text');
+    });
+  });
+
+  describe('getSelectedText - Reading View fallback', () => {
+    it('should use window.getSelection when editor is null', () => {
+      // Arrange
+      handler.setEditor(null as any);
+      const mockSelection = {
+        toString: jest.fn(() => 'reading view text'),
+      };
+      jest.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
+
+      // Act
+      const result = handler.getSelectedText();
+
+      // Assert
+      expect(result).toBe('reading view text');
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+
+    it('should return empty string when window.getSelection returns null', () => {
+      // Arrange
+      handler.setEditor(null as any);
+      jest.spyOn(window, 'getSelection').mockReturnValue(null as any);
+
+      // Act
+      const result = handler.getSelectedText();
+
+      // Assert
+      expect(result).toBe('');
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+
+    it('should prefer editor over window.getSelection when editor is set', () => {
+      // Arrange
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('editor text');
+      const mockSelection = {
+        toString: jest.fn(() => 'window text'),
+      };
+      jest.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
+
+      // Act
+      const result = handler.getSelectedText();
+
+      // Assert
+      expect(result).toBe('editor text');
+      expect(mockSelection.toString).not.toHaveBeenCalled();
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+  });
 });

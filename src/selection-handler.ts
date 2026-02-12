@@ -9,7 +9,7 @@ export class SelectionHandler {
   /**
    * エディターを設定
    */
-  setEditor(editor: Editor): void {
+  setEditor(editor: Editor | null): void {
     this.editor = editor;
   }
 
@@ -17,7 +17,12 @@ export class SelectionHandler {
    * 選択中のテキストを取得
    */
   getSelectedText(): string {
-    return this.editor?.getSelection() || '';
+    if (this.editor) {
+      return this.editor.getSelection() || '';
+    }
+    // Reading View (Preview mode) の場合は window.getSelection() を使用
+    const selection = window.getSelection();
+    return selection ? selection.toString() : '';
   }
 
   /**
@@ -28,42 +33,40 @@ export class SelectionHandler {
   }
 
   /**
-   * 選択テキストを強制的に [[...]] に変換
+   * 選択範囲のハイライト(==)を切り替え
    */
-  convertToLink(): void {
-    if (!this.editor) return;
-
-    let selectedText = this.getSelectedText();
-    if (!selectedText) {
-      const cursor = this.editor.getCursor();
-      this.editor.replaceSelection('[[]]');
-      this.editor.setCursor({
-        line: cursor.line,
-        ch: cursor.ch + 2,
-      });
-      return;
-    }
-
-    selectedText = selectedText
-      .replace(/\[\[/g, '')
-      .replace(/\]\]/g, '')
-      .replace(/\[/g, '')
-      .replace(/\]/g, '');
-
-    const linkedText = `[[${selectedText}]]`;
-    this.editor.replaceSelection(linkedText);
-  }
-
-  /**
-   * 選択範囲からリンクと装飾を削除してプレーンテキストに戻す
-   */
-  removeFormattingAndLinks(): void {
+  toggleHighlight(): void {
     if (!this.editor) return;
 
     let selectedText = this.getSelectedText();
     if (!selectedText) return;
 
-    selectedText = selectedText
+    let newText: string;
+    if (selectedText.startsWith('==') && selectedText.endsWith('==')) {
+      newText = selectedText.substring(2, selectedText.length - 2);
+    } else {
+      newText = `==${selectedText}==`;
+    }
+    this.editor.replaceSelection(newText);
+  }
+
+  /**
+   * 選択テキストをリンク形式に変換する（文字列処理のみ）
+   */
+  formatAsLink(text: string): string {
+    const cleaned = text
+      .replace(/\[\[/g, '')
+      .replace(/\]\]/g, '')
+      .replace(/\[/g, '')
+      .replace(/\]/g, '');
+    return `[[${cleaned}]]`;
+  }
+
+  /**
+   * 選択テキストをプレーンテキストに変換する（文字列処理のみ）
+   */
+  formatAsPlain(text: string): string {
+    return text
       .replace(/\[\[/g, '')
       .replace(/\]\]/g, '')
       .replace(/\[/g, '')
@@ -75,8 +78,38 @@ export class SelectionHandler {
       .replace(/~~/g, '')
       .replace(/==/g, '')
       .replace(/`/g, '');
+  }
 
-    this.editor.replaceSelection(selectedText);
+  /**
+   * 選択テキストを強制的に [[...]] に変換
+   */
+  convertToLink(): void {
+    if (!this.editor) return;
+
+    const selectedText = this.getSelectedText();
+    if (!selectedText) {
+      const cursor = this.editor.getCursor();
+      this.editor.replaceSelection('[[]]');
+      this.editor.setCursor({
+        line: cursor.line,
+        ch: cursor.ch + 2,
+      });
+      return;
+    }
+
+    this.editor.replaceSelection(this.formatAsLink(selectedText));
+  }
+
+  /**
+   * 選択範囲からリンクと装飾を削除してプレーンテキストに戻す
+   */
+  removeFormattingAndLinks(): void {
+    if (!this.editor) return;
+
+    const selectedText = this.getSelectedText();
+    if (!selectedText) return;
+
+    this.editor.replaceSelection(this.formatAsPlain(selectedText));
   }
 
   /**

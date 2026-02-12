@@ -20,8 +20,8 @@ jest.mock('./popup-manager', () => ({
 }));
 
 describe('PositionCalculator - ポップアップ位置計算', () => {
-  let selectionRect: DOMRect;
-  let popupRect: DOMRect;
+  let selectionRect: any;
+  let popupRect: any;
 
   beforeEach(() => {
     // Set default window dimensions
@@ -44,7 +44,7 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       right: 500,
       width: 100,
       height: 30,
-    } as DOMRect;
+    } as any as DOMRect;
 
     popupRect = {
       top: 0,
@@ -53,7 +53,7 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       right: 0,
       width: 200,
       height: 100,
-    } as DOMRect;
+    } as any as DOMRect;
   });
 
   describe('calculate', () => {
@@ -70,7 +70,7 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       expect(['top', 'bottom']).toContain(position.placement);
     });
 
-    it('should place popup above selection when space available', () => {
+    it('should place popup below selection when space available', () => {
       // Arrange
       selectionRect.top = 300;
       selectionRect.bottom = 330;
@@ -79,21 +79,23 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       const position = PositionCalculator.calculate(selectionRect, popupRect);
 
       // Assert
-      expect(position.placement).toBe('top');
-      expect(position.top).toBeLessThan(selectionRect.top);
+      expect(position.placement).toBe('bottom');
+      expect(position.top).toBeGreaterThanOrEqual(selectionRect.bottom);
     });
 
-    it('should place popup below selection when no space above', () => {
+    it('should place popup above selection when no space below', () => {
       // Arrange
-      selectionRect.top = 50;
-      selectionRect.bottom = 80;
+      selectionRect.top = 600;
+      selectionRect.bottom = 630;
+      window.innerHeight = 768;
+      popupRect.height = 150; // Insufficient space below
 
       // Act
       const position = PositionCalculator.calculate(selectionRect, popupRect);
 
       // Assert
-      expect(position.placement).toBe('bottom');
-      expect(position.top).toBeGreaterThanOrEqual(selectionRect.bottom);
+      expect(position.placement).toBe('top');
+      expect(position.top).toBeLessThan(selectionRect.top);
     });
 
     it('should center popup horizontally', () => {
@@ -157,8 +159,8 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       const position = PositionCalculator.calculate(selectionRect, popupRect);
 
       // Assert
-      // When placed above, top should be selection.top - popup.height - TOTAL_OFFSET
-      expect(position.top).toBe(selectionRect.top - popupRect.height - TOTAL_OFFSET);
+      // When placed below, top should be selection.bottom + TOTAL_OFFSET
+      expect(position.top).toBe(selectionRect.bottom + TOTAL_OFFSET);
     });
   });
 
@@ -238,7 +240,7 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
   });
 
   describe('vertical positioning', () => {
-    it('should prefer top placement when space available', () => {
+    it('should prefer bottom placement when space available', () => {
       // Arrange
       selectionRect.top = 400;
       selectionRect.bottom = 430;
@@ -248,20 +250,21 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       const position = PositionCalculator.calculate(selectionRect, popupRect);
 
       // Assert
-      expect(position.placement).toBe('top');
+      expect(position.placement).toBe('bottom');
     });
 
-    it('should use bottom placement when insufficient space above', () => {
+    it('should use top placement when insufficient space below', () => {
       // Arrange
-      selectionRect.top = 100;
-      selectionRect.bottom = 130;
-      popupRect.height = 150;
+      selectionRect.top = 600;
+      selectionRect.bottom = 630;
+      window.innerHeight = 700;
+      popupRect.height = 100; // Total offset is 16, so bottom would be 630 + 16 + 100 = 746 > 690
 
       // Act
       const position = PositionCalculator.calculate(selectionRect, popupRect);
 
       // Assert
-      expect(position.placement).toBe('bottom');
+      expect(position.placement).toBe('top');
     });
 
     it('should favor larger space when neither top nor bottom fits perfectly', () => {
@@ -401,10 +404,8 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
 
       // For normal cases, no collision
       if (
-        position.placement === 'top' &&
-        popupTop >= 10 &&
-        position.placement === 'bottom' &&
-        popupBottom <= 758
+        (position.placement === 'top' && popupTop >= 10) ||
+        (position.placement === 'bottom' && popupBottom <= 758)
       ) {
         expect(!(verticalOverlap && horizontalOverlap)).toBeTruthy();
       }
@@ -613,7 +614,7 @@ describe('PositionCalculator - ポップアップ位置計算', () => {
       // Arrange
       const position1 = PositionCalculator.calculate(selectionRect, popupRect);
 
-      const modifiedRect = { ...selectionRect, top: 100 };
+      const modifiedRect = { ...selectionRect, bottom: 400 };
 
       // Act
       const position2 = PositionCalculator.calculate(modifiedRect, popupRect);

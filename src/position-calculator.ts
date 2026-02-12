@@ -43,16 +43,18 @@ export class PositionCalculator {
     const selectionTop = selectionRect.top;
     const selectionBottom = selectionRect.bottom;
 
-    const topPlacement = selectionTop - popupRect.height - PopupConfig.TOTAL_OFFSET;
-    if (topPlacement >= PopupConfig.SCREEN_MARGIN) {
-      return { top: topPlacement, placement: 'top' };
-    }
-
+    // モバイルの操作性を考慮し、まず下に表示できるかチェック
     const bottomPlacement = selectionBottom + PopupConfig.TOTAL_OFFSET;
     const popupBottom = bottomPlacement + popupRect.height;
 
     if (popupBottom <= viewportHeight - PopupConfig.SCREEN_MARGIN) {
       return { top: bottomPlacement, placement: 'bottom' };
+    }
+
+    // 下に余裕がない場合は上に表示できるかチェック
+    const topPlacement = selectionTop - popupRect.height - PopupConfig.TOTAL_OFFSET;
+    if (topPlacement >= PopupConfig.SCREEN_MARGIN) {
+      return { top: topPlacement, placement: 'top' };
     }
 
     const spaceAbove = selectionTop - PopupConfig.SCREEN_MARGIN;

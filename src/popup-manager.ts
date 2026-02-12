@@ -66,7 +66,7 @@ export class PopupManager {
         // @ts-ignore
         this.plugin.MarkdownView || (await import('obsidian')).MarkdownView
       );
-      if (activeView?.editor) {
+      if (activeView) {
         await this.plugin.buttonRegistry.executeAction(config.id, activeView.editor);
       }
     });

@@ -6,6 +6,7 @@ import { QuickPopupSettings, ButtonConfig } from './types';
 export const DEFAULT_SETTINGS: QuickPopupSettings = {
   version: 1,
   showSeparators: true,
+  locale: 'en',
   buttons: {
     link: {
       id: 'link',
@@ -43,7 +44,27 @@ export const DEFAULT_SETTINGS: QuickPopupSettings = {
       tooltip: 'Split text into paragraphs',
       order: 3,
     },
+    highlight: {
+      id: 'highlight',
+      enabled: true,
+      displayType: 'icon',
+      icon: '🖊️',
+      text: 'Highlight',
+      tooltip: 'Highlight selection',
+      order: 4,
+    },
+    dailynote: {
+      id: 'dailynote',
+      enabled: true,
+      displayType: 'icon',
+      icon: '📅',
+      text: 'Daily',
+      tooltip: 'Send selection to daily note',
+      order: 5,
+    },
   },
+  dailyNotePath: '',
+  dailyNoteFormat: 'YYYY-MM-DD',
 };
 
 /**
@@ -60,6 +81,21 @@ export function migrateSettings(oldSettings: any): QuickPopupSettings {
   // showSeparators を保持
   if (typeof oldSettings.showSeparators === 'boolean') {
     result.showSeparators = oldSettings.showSeparators;
+  }
+
+  // locale を保持
+  if (oldSettings.locale === 'en' || oldSettings.locale === 'ja') {
+    result.locale = oldSettings.locale;
+  }
+
+  // dailyNotePath を保持
+  if (typeof oldSettings.dailyNotePath === 'string') {
+    result.dailyNotePath = oldSettings.dailyNotePath;
+  }
+
+  // dailyNoteFormat を保持
+  if (typeof oldSettings.dailyNoteFormat === 'string') {
+    result.dailyNoteFormat = oldSettings.dailyNoteFormat;
   }
 
   // 既存ボタン設定をマージ
