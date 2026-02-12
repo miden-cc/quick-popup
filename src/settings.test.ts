@@ -163,6 +163,45 @@ describe('migrateSettings - 設定マイグレーション', () => {
     });
   });
 
+  describe('dailyNote settings migration', () => {
+    it('should set default dailyNotePath and dailyNoteFormat for empty settings', () => {
+      const result = migrateSettings({});
+
+      expect(result.dailyNotePath).toBe('');
+      expect(result.dailyNoteFormat).toBe('YYYY-MM-DD');
+    });
+
+    it('should preserve existing dailyNotePath', () => {
+      const result = migrateSettings({
+        dailyNotePath: 'Journal',
+        dailyNoteFormat: 'YYYY/MM/DD',
+      });
+
+      expect(result.dailyNotePath).toBe('Journal');
+      expect(result.dailyNoteFormat).toBe('YYYY/MM/DD');
+    });
+
+    it('should add highlight and dailynote buttons for old settings without them', () => {
+      const oldSettings = {
+        version: 1,
+        showSeparators: true,
+        buttons: {
+          link: DEFAULT_SETTINGS.buttons.link,
+          copy: DEFAULT_SETTINGS.buttons.copy,
+          cosense: DEFAULT_SETTINGS.buttons.cosense,
+          split: DEFAULT_SETTINGS.buttons.split,
+        },
+      };
+
+      const result = migrateSettings(oldSettings);
+
+      expect(result.buttons.highlight).toBeDefined();
+      expect(result.buttons.highlight.id).toBe('highlight');
+      expect(result.buttons.dailynote).toBeDefined();
+      expect(result.buttons.dailynote.id).toBe('dailynote');
+    });
+  });
+
   describe('deep copy', () => {
     it('should not mutate the input settings', () => {
       const original = {

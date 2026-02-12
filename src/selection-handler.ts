@@ -14,6 +14,13 @@ export class SelectionHandler {
   }
 
   /**
+   * エディター参照をクリア（Reading View時に使用）
+   */
+  clearEditor(): void {
+    this.editor = null;
+  }
+
+  /**
    * 選択中のテキストを取得
    */
   getSelectedText(): string {

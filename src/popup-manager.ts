@@ -62,13 +62,7 @@ export class PopupManager {
     }
 
     button.addEventListener('click', async () => {
-      const activeView = this.plugin.app.workspace.getActiveViewOfType(
-        // @ts-ignore
-        this.plugin.MarkdownView || (await import('obsidian')).MarkdownView
-      );
-      if (activeView) {
-        await this.plugin.buttonRegistry.executeAction(config.id, activeView.editor);
-      }
+      await this.plugin.buttonRegistry.executeAction(config.id, null);
     });
 
     return button;

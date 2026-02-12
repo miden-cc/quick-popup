@@ -475,6 +475,29 @@ describe('SelectionHandler - テキスト選択処理', () => {
     });
   });
 
+  describe('clearEditor', () => {
+    it('should clear editor reference and fall back to DOM selection', () => {
+      // Arrange - editor is set from beforeEach
+      (mockEditor.getSelection as jest.Mock).mockReturnValue('editor text');
+      expect(handler.getSelectedText()).toBe('editor text');
+
+      const mockSelection = {
+        toString: jest.fn(() => 'dom text'),
+      };
+      jest.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
+
+      // Act
+      handler.clearEditor();
+      const result = handler.getSelectedText();
+
+      // Assert
+      expect(result).toBe('dom text');
+
+      // Cleanup
+      (window.getSelection as jest.Mock).mockRestore();
+    });
+  });
+
   describe('getSelectedText - Reading View fallback', () => {
     it('should use window.getSelection when editor is null', () => {
       // Arrange

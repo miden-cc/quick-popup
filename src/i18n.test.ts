@@ -147,4 +147,61 @@ describe('I18n - 多言語対応', () => {
       expect(ja.t('language')).toBe('言語');
     });
   });
+
+  describe('daily note strings', () => {
+    it('should have daily note setting translations', () => {
+      const en = new I18n('en');
+      const ja = new I18n('ja');
+
+      expect(en.t('dailyNoteSettings')).toBe('Daily Note Settings');
+      expect(ja.t('dailyNoteSettings')).toBe('デイリーノート設定');
+
+      expect(en.t('dailyNotePath')).toBe('Daily note folder');
+      expect(ja.t('dailyNotePath')).toBeTruthy();
+
+      expect(en.t('dailyNoteFormat')).toBe('Filename format');
+      expect(ja.t('dailyNoteFormat')).toBeTruthy();
+    });
+
+    it('should have daily note notice translations', () => {
+      const en = new I18n('en');
+      const ja = new I18n('ja');
+
+      expect(en.t('savedToDaily', { fileName: 'test.md' })).toBe('Saved to daily note: test.md');
+      expect(ja.t('savedToDaily', { fileName: 'test.md' })).toBe('デイリーノートに保存しました: test.md');
+
+      expect(en.t('dailyNoteNotFound')).toBeTruthy();
+      expect(ja.t('dailyNoteNotFound')).toBeTruthy();
+
+      expect(en.t('failedToAddToDailyNote')).toBeTruthy();
+      expect(ja.t('failedToAddToDailyNote')).toBeTruthy();
+    });
+  });
+
+  describe('reading view and web strings', () => {
+    it('should have reading view notice translations', () => {
+      const en = new I18n('en');
+      const ja = new I18n('ja');
+
+      expect(en.t('readingViewNotSupported')).toBeTruthy();
+      expect(ja.t('readingViewNotSupported')).toBeTruthy();
+
+      expect(en.t('textConverted')).toBe('Text converted to link');
+      expect(ja.t('textConverted')).toBeTruthy();
+
+      expect(en.t('textNotFoundInSource')).toBeTruthy();
+      expect(ja.t('textNotFoundInSource')).toBeTruthy();
+    });
+
+    it('should have web link notice translations', () => {
+      const en = new I18n('en');
+      const ja = new I18n('ja');
+
+      expect(en.t('createdLinkedNote', { fileName: 'test' })).toBe('Created linked note: test');
+      expect(ja.t('createdLinkedNote', { fileName: 'test' })).toBeTruthy();
+
+      expect(en.t('linkedExistingNote', { fileName: 'test' })).toBe('Linked to existing note: test');
+      expect(ja.t('linkedExistingNote', { fileName: 'test' })).toBeTruthy();
+    });
+  });
 });
